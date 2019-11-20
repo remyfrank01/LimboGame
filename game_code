@@ -1,0 +1,203 @@
+from cmu_112_graphics import *
+from tkinter import *
+import random
+
+class Player(object):
+    def __init__(self, cx, cy):
+        self.cx = cx
+        self.cy = cy
+        self.cyChangeRate = 10
+        self.speed = 5
+
+class Enemy(object):
+    def __init__(self, cx, cy):
+        self.cx = cx
+        self.cy = cy
+        self.speed = 8
+
+
+class Wall(object):
+    def __init__(self, cx, cy, width, height):
+        self.cx = cx
+        self.cy = cy
+        self.width = width
+        self.height = height
+
+class GameMode(Mode):
+    def appStarted(mode):
+        mode.gameWon = False
+        mode.isGameOver = False
+        mode.scrollY = 0
+        mode.scrollX = 0
+        mode.points = 0
+        mode.walls = []
+        mode.walkCount = 0
+        mode.rightKeyIsPressed = False
+        mode.stationaryAnimation = [self.loadImage('Stationary.png'), self.loadImage('walk1.png')]
+        mode.walkingRightAnimation = [self.loadImage('walk2.png'), self.loadImage('walk3.png'),\
+                self.loadImage('walk4.png'), self.loadImage('walk5.png'), self.loadImage('walk6.png'), \
+                self.loadImage('walk7.png'), self.loadImage('walk8.png')]
+        mode.currPlayerModel = mode.stationaryAnimation[0]
+    
+    def keyPressed(mode, event):
+        if(event.key == "Space"):
+            player.cy -= 10
+            player.cyChangeRate = -15
+        elif(event.key == "Right"):
+            player.cx += 10
+            mode.rightKeyIsPressed = True
+            mode.currPlayerModel = mode.stationaryAnimation[1]
+        elif(event.key == "p"):
+            mode.app.setActiveMode(mode.app.pauseMode)
+    
+    def keyReleased(mode, event):
+        if(event.key == "Right"):
+            mode.rightKeyIsPressed = False
+            mode.currPlayerModel = mode.stationaryAnimation[0]
+            
+
+    def mousePressed(mode, event):
+        pass
+    
+    def timerFired(mode):
+        if(mode.rightKeyIsPressed):
+            mode.walkCount += 1
+            mode.currPlayerModel = mode.walkingRightAnimation[mode.walkCount//7]
+        if(mode.gameWon):
+            mode.gameWon = False
+            mode.points = 0
+            mode.cx = mode.width//2
+            mode.cy = mode.height//2
+            mode.app.setActiveMode(mode.app.winningMode)
+            return
+        if(mode.isGameOver):
+            mode.isGameOver = False
+            mode.points = 0
+            mode.cx = mode.width//2
+            mode.cy = mode.height//2
+            mode.app.setActiveMode(mode.app.overMode)
+            return
+        player.cy += 2
+    
+    def drawWorld(mode, canvas):
+        pass
+
+    def drawBackgound(mode, canvas):
+        pass
+
+    def drawBirds(mode, canvas):
+        pass
+
+    def redrawAll(mode, canvas):
+        pass
+
+class TitleScreenMode(Mode):
+    def appStarted(mode):
+        mode.displayImages = [self.loadImage('TitleScreen.png'), self.loadImage('TitleScreen2.png')]
+        mode.currImage = mode.displayImages[1]
+        mode.display = mode.scaleImage(mode.currImage, .25)
+    
+    def mousePressed(mode, event):
+        clickX, clickY = event.x, event.y
+        if(event.x >= 300 and event.x <= 400):
+            if(event.y >= 200 and event.y <= 250):
+                mode.app.setActiveMode(mode.app.gameMode)
+            elif(event.y >= 275 and event.y <= 325):
+                mode.app.setActiveMode(mode.app.helpMode)
+            elif(event.y >= 350 and event.y <= 400):
+                mode.app.setActiveMode(mode.app.highScores)
+            elif(event.y >= 425 and event.y <= 475):
+                mode.app.setActiveMode(mode.app.wallOfFame)
+
+    
+    def timerFired(mode):
+        mode.currImage = mode.displayImages[1]
+        changeScreen = random.randrange(100)
+        if(changeScreen > 90):
+            mode.currImage = mode.displayImages[0]
+        mode.display = mode.scaleImage(mode.currImage, .25)
+    
+    def redrawAll(mode):
+        canvas.create_text(350, 100, text = 'LIMBO', font = 'Helvetica 30 bold', fill = 'white')
+        canvas.create_image(200, 450, image = ImageTk.PhotoImage(mode.display))
+        canvas.create_rectangle(300, 200, 400, 250, fill = "grey", outline = 'black', smooth = 1)
+        canvas.create_rectangle(300, 275, 400, 325, fill = "grey", outline = 'black', smooth = 1)
+        canvas.create_rectangle(300, 350, 400, 400, fill = "grey", outline = 'black', smooth = 1)
+        canvas.create_rectangle(300, 425, 400, 475, fill = "grey", outline = 'black', smooth = 1)
+        canvas.create_text(350, 225, text = 'Start Game', font = 'Helvetica 12', fill = 'black')
+        canvas.create_text(350, 300, text = 'How To Play', font = 'Helvetica 12', fill = 'black')
+        canvas.create_text(350, 375, text = 'High Scores', font = 'Helvetica 12', fill = 'black')
+        canvas.create_text(350, 450, text = 'Wall Of Fame', font = 'Helvetica 12', fill = 'black')
+
+class WallOfFameMode(Mode):
+    def appStarted(mode):
+    def mousePressed(mode):
+    
+    def keyPressed(mode):
+    
+    def timerFired(mode):
+    
+    def drawPlayer(mode):
+    
+    def redrawAll(mode):
+
+class HighScoresMode(Mode):
+    def appStarted(mode):
+    
+    def mousePressed(mode):
+    
+    def drawScores(mode):
+    
+    def redrawAll(mode):
+
+class GameOverMode(Mode):
+    def appStarted(mode):
+    
+    def keyPressed(mode):
+    
+    def timerFired(mode):
+    
+    def redrawAll(mode):
+
+class CutScreen(Mode):
+    def appStarted(mode):
+
+    def keyPressed(mode):
+    
+    def timerFired(mode):
+    
+    def redrawAll(mode):
+
+class InstructionsMode(Mode):
+    def appStarted(mode):
+    
+    def keyPressed(mode):
+    
+    def redrawAll(mode):
+
+class PauseMenuMode(Mode):
+    def appStarted(mode):
+    
+    def timerFired(mode):
+    
+    def redrawAll(mode):
+
+class WinMode(Mode):
+    def appStarted(mode):
+
+class MyModalApp(ModalApp):
+    def appStarted(app):
+        app.titleScreenMode = TitleScreenMode()
+        app.overMode = GameOverMode()
+        app.gameMode = GameMode()
+        app.helpMode = InstructionsMode()
+        app.winningMode = WinMode()
+        app.pauseMode = PauseMenuMode()
+        app.cutSCreen = CutScreenMode()
+        app.highScores = HighScoresMode()
+        app.wallOfFame = WallOfFameMode()
+        app.setActiveMode(app.titleScreenMode)
+        app.timerDelay = 40
+
+app = MyModalApp(width=500, height=700)
+    

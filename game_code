@@ -3,13 +3,15 @@ from tkinter import *
 import random
 
 class Player(object):
+    players = []
+    speed = 7
+    lives = 3
+    cyChangeRate = 8
+
     def __init__(self, cx, cy, color):
         self.cx = cx
         self.cy = cy
-        self.cyChangeRate = 10
-        self.speed = 5
-        self.lives = 3
-        self.players += [(cx, cy, color)]
+        Player.players += [(cx, cy, color)]
 
 class Enemy(object):
     def __init__(self, cx, cy):
@@ -26,14 +28,49 @@ class Wall(object):
         self.width = width
         self.height = height
 
+class Bullet(object):
+    bullets = []
+    cyChangeRate = .5
+
+    def __init__(self, cx, cy, color, speed):
+        self.cx = cx
+        self.cy = cy
+        self.color = color
+        self.speed = speed
+        Bullet.bullets += [[self.cx, self.cy, self.color, self.speed]]
+
 class Bird(object):
     def __init__(self, cx, cy, changeX):
         self.cx = cx
         self.cy = random.randrange(50, 200)
         self.changeX = changeX
 
-class GameMode(Mode):
+class TutorialMode(Mode):
     def appStarted(mode):
+        mode.playerNum = len(Player.players)
+
+        mode.oneIsFacingRight = True
+        mode.twoIsFacingRight = True
+
+        #Player 1
+        mode.playerOneCx = Player.players[0][0]
+        mode.playerOneCy = Player.players[0][1]
+        mode.playerOneVel = Player.speed
+        mode.playerOneLives = Player.lives
+        mode.playerOneDy = Player.cyChangeRate
+        mode.playerOneJumpCount = 0
+        mode.oneIsJumping = False
+
+        #Player 2
+        if(mode.playerNum > 1):
+            mode.playerTwoCx = Player.players[1][0]
+            mode.playerTwoCy = Player.players[1][1]
+            mode.playerTwoVel = Player.speed
+            mode.playerTwoLives = Player.lives
+            mode.playerTwoDy = Player.cyChangeRate
+            mode.playerTwoJumpCount = 0
+            mode.twoIsJumping = False
+
         mode.gameWon = False
         mode.isGameOver = False
         mode.isPaused = False
@@ -41,36 +78,135 @@ class GameMode(Mode):
         mode.scrollX = 0
         mode.points = 0
         mode.walls = []
-        mode.walkCount = 0
+        mode.walkCountOne = 0
+        mode.walkCountTwo = 0
         mode.rightKeyIsPressed = False
-        mode.stationaryAnimation = [mode.loadImage('Stationary.png'), mode.loadImage('walk1.png')]
-        mode.walkingRightAnimation = [mode.loadImage('walk2.png'), mode.loadImage('walk3.png'),\
-                mode.loadImage('walk4.png'), mode.loadImage('walk5.png'), mode.loadImage('walk6.png'), \
-                mode.loadImage('walk7.png'), mode.loadImage('walk8.png')]
-        mode.currPlayerModel = mode.stationaryAnimation[0]
+        mode.dKeyIsPressed = False
+        mode.leftKeyIsPressed = False
+        mode.aKeyIsPressed = False
+
+        #Standing Animations(left and right)
+        mode.stationaryAnimationRight = [mode.scaleImage(mode.loadImage('Stationary.png'), .3),\
+            mode.scaleImage(mode.loadImage('walk1.png'), .3)]
+        mode.stationaryAnimationLeft = [mode.scaleImage(mode.loadImage('StationaryLeft.png'), .3),\
+            mode.scaleImage(mode.loadImage('walkLeft1.png'), .3)]
+
+        #Right facing animations
+        mode.walkingRightAnimation = [mode.scaleImage(mode.loadImage('walk2.png'), .3),\
+                mode.scaleImage(mode.loadImage('walk3.png'), .3),\
+                mode.scaleImage(mode.loadImage('walk4.png'), .3),\
+                mode.scaleImage(mode.loadImage('walk5.png'), .3),\
+                mode.scaleImage(mode.loadImage('walk6.png'), .3),\
+                mode.scaleImage(mode.loadImage('walk7.png'), .3),\
+                mode.scaleImage(mode.loadImage('walk8.png'), .3)]
+        
+        #Left facing animations
+        mode.walkingLeftAnimation = [mode.scaleImage(mode.loadImage('walkLeft2.png'), .3),\
+                mode.scaleImage(mode.loadImage('walkLeft3.png'), .3),\
+                mode.scaleImage(mode.loadImage('walkLeft4.png'), .3),\
+                mode.scaleImage(mode.loadImage('walkLeft5.png'), .3),\
+                mode.scaleImage(mode.loadImage('walkLeft6.png'), .3),\
+                mode.scaleImage(mode.loadImage('walkLeft7.png'), .3),\
+                mode.scaleImage(mode.loadImage('walkLeft8.png'), .3)]
+        
+        mode.currPlayerOneModel = mode.stationaryAnimationRight[0]
         mode.createBird = False
         mode.birdFlying = [mode.scaleImage(mode.loadImage('BirdUp.png'), .3), \
             mode.scaleImage(mode.loadImage('BirdNull.png'), .3),\
             mode.scaleImage(mode.loadImage('BirdDown.png'), .3)]
         mode.birds = []
         mode.birdPosition = 0
+
+        mode.bulletRadius = 2
+        mode.oneCanShoot = True
+        mode.twoCanShoot = False
+        mode.spaceClicks = 0
+        mode.tabClicks = 0
+
+        if(mode.playerNum == 1):
+            mode.playerOneColor = Player.players[0][2]
+        else:
+            mode.playerOneColor = Player.players[0][2]
+            mode.playerTwoColor = Player.players[1][2]
+            mode.currPlayerTwoModel = mode.stationaryAnimationRight[0]
     
     def keyPressed(mode, event):
-        if(event.key == "Space"):
-            player.cy -= 10
-            player.cyChangeRate = -15
+        if(event.key == "Up" and mode.playerOneJumpCount < 2 and mode.oneIsJumping == False):
+            mode.playerOneCy -= 75
+            mode.playerOneJumpCount += 1
+            mode.oneIsJumping = True
+        elif(event.key == 'w' and mode.playerNum == 2 and mode.playerTwoJumpCount < 2 and mode.twoIsJumping == False):
+            mode.playerTwoCy -= 75
+            mode.playerTwoJumpCount += 1
+            mode.twoIsJumping = True
         elif(event.key == "Right"):
-            player.cx += 10
+            #mode.playerOneCx += 10
+            mode.oneIsFacingRight = True
             mode.rightKeyIsPressed = True
-            mode.currPlayerModel = mode.stationaryAnimation[1]
+            mode.currPlayerModelOne = mode.stationaryAnimationRight[1]
+        elif(event.key == 'Left'):
+            #mode.playerOneCx -= 10
+            mode.oneIsFacingRight = False
+            mode.leftKeyIsPressed = True
+            mode.rightKeyIsPressed = False
+            mode.currPlayerModelOne = mode.stationaryAnimationLeft[1]
         elif(event.key == "p"):
             mode.isPaused = True
             mode.app.setActiveMode(mode.app.pauseMode)
+        elif(event.key == 'd' and mode.playerNum == 2):
+            #mode.playerTwoCx += 10
+            mode.twoIsFacingRight = True
+            mode.dKeyIsPressed = True
+            mode.currPlayerModelTwo = mode.stationaryAnimationRight[1]
+        elif(event.key == 'a' and mode.playerNum == 2):
+            #mode.playerTwoCx -= 10
+            mode.twoIsFacingRight = False
+            mode.aKeyIsPressed = True
+            mode.dKeyIsPressed = False
+            mode.currPlayerModelTwo = mode.stationaryAnimationLeft[1]
+        
+        #Shooting mechanism
+        if(event.key == 'Space' and mode.oneCanShoot):
+            mode.spaceClicks += 1
+            if(mode.spaceClicks % 2 == 0):
+                if(mode.oneIsFacingRight):
+                    Bullet(mode.playerOneCx, mode.playerOneCy-25, mode.playerOneColor, 12)
+                else:
+                    Bullet(mode.playerOneCx, mode.playerOneCy-25, mode.playerOneColor, -12)
+                mode.oneCanShoot = False
+        
+        elif(event.key == 'Tab' and mode.playerNum == 2 and mode.twoCanShoot):
+            mode.tabClicks += 1
+            if(mode.tabClicks % 2 == 0):
+                if(mode.twoIsFacingRight):
+                    Bullet(mode.playerTwoCx, mode.playerTwoCy-25, mode.playerTwoColor, 12)
+                else:
+                    Bullet(mode.playerTwoCx, mode.playerTwoCy-25, mode.playerTwoColor, -12)
+                mode.twoCanShoot = False
     
     def keyReleased(mode, event):
         if(event.key == "Right"):
             mode.rightKeyIsPressed = False
-            mode.currPlayerModel = mode.stationaryAnimation[0]
+            mode.currPlayerOneModel = mode.stationaryAnimationRight[0]
+        elif(event.key == "Left"):
+            mode.leftKeyIsPressed = False
+            mode.currPlayerOneModel = mode.stationaryAnimationLeft[0]
+        elif(event.key == 'Up'):
+            mode.oneIsJumping = False
+
+        if(event.key == 'd'):
+            mode.dKeyIsPressed = False
+            mode.currPlayerTwoModel = mode.stationaryAnimationRight[0]
+        elif(event.key == 'a'):
+            mode.aKeyIsPressed = False
+            mode.currPlayerTwoModel = mode.stationaryAnimationLeft[0]
+        elif(event.key == 'w'):
+            mode.twoIsJumping = False
+        
+        if(event.key == 'Space'):
+            mode.oneCanShoot = True
+        if(event.key == 'Tab'):
+            mode.twoCanShoot = True
             
 
     def mousePressed(mode, event):
@@ -86,11 +222,41 @@ class GameMode(Mode):
             bird.cx -= bird.changeX
             if(bird.cx <= -25):
                 mode.birds.remove(bird)
-        if(newBird >= 99):
+        if(newBird >= 98):
             mode.createBird = True
+        
+        for bullet in Bullet.bullets:
+            bullet[0] += bullet[3]
+            bullet[1] += Bullet.cyChangeRate
+
+        #Walking Right
         if(mode.rightKeyIsPressed):
-            mode.walkCount += 1
-            mode.currPlayerModel = mode.walkingRightAnimation[mode.walkCount//7]
+            mode.playerOneCx += mode.playerOneVel
+            mode.walkCountOne += 1
+            if(mode.walkCountOne >= 7):
+                mode.walkCountOne = 1
+            mode.currPlayerOneModel = mode.walkingRightAnimation[mode.walkCountOne%7]
+        if(mode.dKeyIsPressed):
+            mode.playerTwoCx += mode.playerTwoVel
+            mode.walkCountTwo += 1
+            if(mode.walkCountTwo >= 7):
+                mode.walkCountTwo = 1
+            mode.currPlayerTwoModel = mode.walkingRightAnimation[mode.walkCountTwo%7]
+        
+        #Walking Left
+        if(mode.leftKeyIsPressed):
+            mode.playerOneCx -= mode.playerOneVel
+            mode.walkCountOne += 1
+            if(mode.walkCountOne >= 7):
+                mode.walkCountOne = 1
+            mode.currPlayerOneModel = mode.walkingLeftAnimation[mode.walkCountOne%7]
+        if(mode.aKeyIsPressed):
+            mode.playerTwoCx -= mode.playerTwoVel
+            mode.walkCountTwo += 1
+            if(mode.walkCountTwo >= 7):
+                mode.walkCountTwo = 1
+            mode.currPlayerTwoModel = mode.walkingLeftAnimation[mode.walkCountTwo%7]
+        
         if(mode.gameWon):
             mode.gameWon = False
             mode.points = 0
@@ -105,14 +271,48 @@ class GameMode(Mode):
             mode.cy = mode.height//2
             mode.app.setActiveMode(mode.app.overMode)
             return
-        #player.cy += 2
+        if(mode.playerNum > 1):
+            mode.playerTwoCy += mode.playerTwoDy
+            mode.checkPlayerTwoBounds()
+        mode.playerOneCy += mode.playerOneDy
+        mode.checkPlayerOneBounds()
+
         mode.birdPosition += 1
+    
+    def checkPlayerOneBounds(mode):
+        if(mode.playerOneCy + 50 >= mode.height):
+            mode.playerOneCy = mode.height - 50
+            mode.playerOneJumpCount = 0
+            mode.oneIsJumping = False
+
+        if(mode.playerOneCx - 20 <= 0):
+            mode.playerOneCx = 20
+        elif(mode.playerOneCx + 20 >= mode.width):
+            mode.playerOneCx = mode.width - 20
+    
+    def checkPlayerTwoBounds(mode):
+        if(mode.playerTwoCy + 50 >= mode.height):
+            mode.playerTwoCy = mode.height - 50
+            mode.playerTwoJumpCount = 0
+            mode.twoIsJumping = False
+
+        if(mode.playerTwoCx - 20 <= 0):
+            mode.playerTwoCx = 20
+        elif(mode.playerTwoCx + 20 >= mode.width):
+            mode.playerTwoCx = mode.width - 20
     
     def drawWorld(mode, canvas):
         pass
 
-    def drawBackgound(mode, canvas):
-        pass
+    def drawBackground(mode, canvas):
+        instructions = '''\t  Press [Right / d] to go right\n
+                    Press [Left / a] to go left\n
+                    Press [Up / w] to jump\n
+                    Press [Space / Tab] to shoot enemy players'''
+        canvas.create_text(mode.width//2, mode.height//2 - mode.height//4, text = 'Tutorial Mode',\
+            font = 'System 30 bold', fill = 'white')
+        canvas.create_text(mode.width//2, mode.height//2, text = instructions,\
+            font = 'System 15 bold', fill = 'white')
 
     def drawBirds(mode, canvas):
         if(mode.birdPosition > 2):
@@ -126,12 +326,39 @@ class GameMode(Mode):
                  canvas.create_image(bird.cx, bird.cy, image = ImageTk.PhotoImage(mode.birdFlying[1]))
             elif(mode.birdPosition == 2):
                  canvas.create_image(bird.cx, bird.cy, image = ImageTk.PhotoImage(mode.birdFlying[0]))
-
+    
+    def drawPlayers(mode, canvas):
+        if (mode.playerNum == 1):
+            canvas.create_image(mode.playerOneCx, mode.playerOneCy, image = ImageTk.PhotoImage(mode.currPlayerOneModel))
+        else:
+            canvas.create_image(mode.playerOneCx, mode.playerOneCy, image = ImageTk.PhotoImage(mode.currPlayerOneModel))
+            canvas.create_image(mode.playerTwoCx, mode.playerTwoCy, image = ImageTk.PhotoImage(mode.currPlayerTwoModel))
+    
+    def drawPlayerIdentifiers(mode, canvas):
+        if(mode.playerNum == 1):
+            canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
+                mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
+        else:
+            canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
+                mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
+            canvas.create_oval(mode.playerTwoCx - 5, mode.playerTwoCy - 60, mode.playerTwoCx + 5,\
+                mode.playerTwoCy - 50, fill = mode.playerTwoColor, outline = 'white', width = 2)
+    
+    #Draw Bullets
+    def drawProjectiles(mode, canvas):
+        for bullet in Bullet.bullets:
+            canvas.create_oval(bullet[0] - mode.bulletRadius, bullet[1] - mode.bulletRadius,\
+                bullet[0] + mode.bulletRadius, bullet[1] + mode.bulletRadius, fill = bullet[2],\
+                    outline = 'black')
 
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
         canvas.create_rectangle(0, 475, mode.width, mode.height, fill = 'black')
         mode.drawBirds(canvas)
+        mode.drawPlayers(canvas)
+        mode.drawPlayerIdentifiers(canvas)
+        mode.drawBackground(canvas)
+        mode.drawProjectiles(canvas)
 
 class TitleScreenMode(Mode):
     def appStarted(mode):
@@ -149,14 +376,19 @@ class TitleScreenMode(Mode):
         mode.buttonTwoRed = mode.scaleImage(mode.loadImage('twoPlayerRed.png'), .4)
         mode.isButtonOneClicked = True
         mode.isButtonTwoClicked = False
+
         mode.isTwoPlayer = False
         mode.isOnePlayer = True
+
     
     def mousePressed(mode, event):
         clickX, clickY = event.x, event.y
         if(clickX >= 300 and clickX <= 400):
             if(clickY >= 200 and clickY <= 250):
-                mode.app.setActiveMode(mode.app.playerDesignMode)
+                if(mode.isOnePlayer):
+                    mode.app.setActiveMode(mode.app.playerDesignModeOne)
+                elif(mode.isTwoPlayer):
+                    mode.app.setActiveMode(mode.app.playerDesignModeTwo)
             elif(clickY >= 275 and clickY <= 325):
                 mode.app.setActiveMode(mode.app.helpMode)
             elif(clickY >= 350 and clickY <= 400):
@@ -211,6 +443,8 @@ class TitleScreenMode(Mode):
         mode.drawPlayerButtons(canvas)
         mode.drawPlayersOnScreen(canvas)
         canvas.create_image(mode.cx, mode.cy - mode.cy//2, image = ImageTk.PhotoImage(mode.titleImage))
+        canvas.create_text(mode.cx, mode.cy - mode.cy//3 - 10, text = '8-bit Version', fill = 'white',\
+            font = 'System 2')
         canvas.create_polygon(300, 200, 300, 250, 400, 250, 400, 200, fill = "grey", outline = 'black', smooth = 1)
         canvas.create_polygon(300, 275, 300, 325, 400, 325, 400, 275, fill = "grey", outline = 'black', smooth = 1)
         canvas.create_polygon(300, 350, 300, 400, 400, 400, 400, 350, fill = "grey", outline = 'black', smooth = 1)
@@ -220,11 +454,10 @@ class TitleScreenMode(Mode):
         canvas.create_text(350, 375, text = 'High Scores', font = 'Helvetica 12', fill = 'black')
         canvas.create_text(350, 450, text = 'Wall Of Fame', font = 'Helvetica 12', fill = 'black')
 
-class PlayerDesignMode(Mode):
+class PlayerDesignModeOne(Mode):
     def appStarted(mode):
         mode.cx, mode.cy = mode.width//2, mode.height//2
         mode.color1 = None
-        mode.color2 = None
         mode.outlineBlue = 'black'
         mode.outlineMagenta = 'black'
         mode.outlineGreen = 'black'
@@ -233,8 +466,9 @@ class PlayerDesignMode(Mode):
         clickX, clickY = event.x, event.y
         if(clickX > mode.cx - 75 and clickX < mode.cx + 75):
             if(clickY > mode.height - 100 and clickY < mode.height - 50):
-                mode.app.setActiveMode(mode.app.gameMode)
-        if(clickX > 50 and clickX < 100):
+                player1 = Player(50, mode.height - 50, mode.color1)
+                mode.app.setActiveMode(mode.app.tutorialMode)
+        if(clickX > 35 and clickX < 115):
             if(clickY > mode.height-50 and clickY < mode.height-25):
                 mode.app.setActiveMode(mode.app.titleScreenMode)
         #blue circle
@@ -242,24 +476,24 @@ class PlayerDesignMode(Mode):
             if(clickY > mode.cy - mode.cy//2 + 40 and clickY < mode.cy - mode.cy//2 + 60):
                 mode.color1 = 'blue'
                 mode.outlineBlue = 'white'
-                mode.outlineMagenta = 'grey'
-                mode.outlineGreen = 'grey'
+                mode.outlineMagenta = 'black'
+                mode.outlineGreen = 'black'
         
         #green circle
         if(clickX > mode.cx - mode.cx//2 + 150 and clickX < mode.cx - mode.cx//2 + 170):
             if(clickY > mode.cy - mode.cy//2 + 40 and clickY < mode.cy - mode.cy//2 + 60):
-                mode.color1 = 'green'
+                mode.color1 = 'green2'
                 mode.outlineGreen = 'white'
-                mode.outlineBlue = 'grey'
-                mode.outlineMagenta = 'grey'
+                mode.outlineBlue = 'black'
+                mode.outlineMagenta = 'black'
         
         #magenta circle
         if(clickX > mode.cx - mode.cx//2 + 190 and clickX < mode.cx - mode.cx//2 + 210):
             if(clickY > mode.cy - mode.cy//2 + 40 and clickY < mode.cy - mode.cy//2 + 60):
                 mode.color1 = 'magenta'
                 mode.outlineMagenta = 'white'
-                mode.outlineBlue = 'grey'
-                mode.outlineGreen = 'grey'
+                mode.outlineBlue = 'black'
+                mode.outlineGreen = 'black'
 
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
@@ -275,6 +509,117 @@ class PlayerDesignMode(Mode):
             mode.cy - mode.cy//2 + 60, fill = 'green2', outline = mode.outlineGreen, width = 4)
         canvas.create_oval(mode.cx - mode.cx//2 + 190, mode.cy - mode.cy//2 + 40, mode.cx - mode.cx//2 + 210,\
             mode.cy - mode.cy//2 + 60, fill = 'magenta', outline = mode.outlineMagenta, width = 4)
+        canvas.create_rectangle(mode.cx - 75, mode.height - 100, mode.cx + 75,\
+            mode.height - 50, fill = 'dark grey', outline = 'white')
+        canvas.create_text(mode.cx, mode.height - 75, text = 'Begin', fill = 'black', font = 'Helvetica 24 italic')
+        canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
+            outline = 'white')
+        canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
+            font = 'Helvetica 10 bold')
+
+class PlayerDesignModeTwo(Mode):
+    def appStarted(mode):
+        mode.cx, mode.cy = mode.width//2, mode.height//2
+        mode.color1 = None
+        mode.color2 = None
+        mode.outlineBlue = 'black'
+        mode.outlineMagenta = 'black'
+        mode.outlineGreen = 'black'
+
+        mode.outlineBlueTwo = 'black'
+        mode.outlineMagentaTwo = 'black'
+        mode.outlineGreenTwo = 'black'
+    
+    def mousePressed(mode, event):
+        clickX, clickY = event.x, event.y
+        if(clickX > mode.cx - 75 and clickX < mode.cx + 75):
+            if(clickY > mode.height - 100 and clickY < mode.height - 50):
+                player1 = Player(50, mode.height - 30, mode.color1)
+                player2 = Player(30, mode.height - 30, mode.color2)
+                mode.app.setActiveMode(mode.app.tutorialMode)
+        if(clickX > 35 and clickX < 115):
+            if(clickY > mode.height-50 and clickY < mode.height-25):
+                mode.app.setActiveMode(mode.app.titleScreenMode)
+        #blue circle
+        if(clickX > mode.cx - mode.cx//2 + 110 and clickX < mode.cx - mode.cx//2 + 130):
+            if(clickY > mode.cy - mode.cy//2 + 40 and clickY < mode.cy - mode.cy//2 + 60):
+                mode.color1 = 'blue'
+                mode.outlineBlue = 'white'
+                mode.outlineMagenta = 'black'
+                mode.outlineGreen = 'black'
+        
+        #green circle
+        if(clickX > mode.cx - mode.cx//2 + 150 and clickX < mode.cx - mode.cx//2 + 170):
+            if(clickY > mode.cy - mode.cy//2 + 40 and clickY < mode.cy - mode.cy//2 + 60):
+                mode.color1 = 'green'
+                mode.outlineGreen = 'white'
+                mode.outlineBlue = 'black'
+                mode.outlineMagenta = 'black'
+        
+        #magenta circle
+        if(clickX > mode.cx - mode.cx//2 + 190 and clickX < mode.cx - mode.cx//2 + 210):
+            if(clickY > mode.cy - mode.cy//2 + 40 and clickY < mode.cy - mode.cy//2 + 60):
+                mode.color1 = 'magenta'
+                mode.outlineMagenta = 'white'
+                mode.outlineBlue = 'black'
+                mode.outlineGreen = 'black'
+        
+        #blue circle two
+        if(clickX > mode.cx - mode.cx//2 + 110 and clickX < mode.cx - mode.cx//2 + 130):
+            if(clickY > mode.cy + 40 and clickY < mode.cy + 60):
+                mode.color2 = 'blue'
+                mode.outlineBlueTwo = 'white'
+                mode.outlineMagentaTwo = 'black'
+                mode.outlineGreenTwo = 'black'
+        
+        #green circle two
+        if(clickX > mode.cx - mode.cx//2 + 150 and clickX < mode.cx - mode.cx//2 + 170):
+            if(clickY > mode.cy + 40 and clickY < mode.cy + 60):
+                mode.color2 = 'green'
+                mode.outlineGreenTwo = 'white'
+                mode.outlineBlueTwo = 'black'
+                mode.outlineMagentaTwo = 'black'
+        
+        #magenta circle two
+        if(clickX > mode.cx - mode.cx//2 + 190 and clickX < mode.cx - mode.cx//2 + 210):
+            if(clickY > mode.cy + 40 and clickY < mode.cy + 60):
+                mode.color2 = 'magenta'
+                mode.outlineMagentaTwo = 'white'
+                mode.outlineBlueTwo = 'black'
+                mode.outlineGreenTwo = 'black'
+
+    def redrawAll(mode, canvas):
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
+
+        #Player 1
+        canvas.create_text(mode.cx - mode.cx//2, mode.cy - mode.cy//2, text = 'Enter Player Name:',\
+            fill = 'white', font = '20')
+        canvas.create_rectangle(mode.cx - mode.cx//2 + 100, mode.cy - mode.cy//2 - 10,\
+            mode.cx - mode.cx//2 + 250, mode.cy - mode.cy//2 + 10, fill = 'grey', outline = 'white')
+        canvas.create_text(mode.cx - mode.cx//2, mode.cy - mode.cy//2 + 50, text = 'Choose Player Color:',\
+            fill = 'white', font = '20')
+        canvas.create_oval(mode.cx - mode.cx//2 + 110, mode.cy - mode.cy//2 + 40, mode.cx - mode.cx//2 + 130,\
+            mode.cy - mode.cy//2 + 60, fill = 'blue', outline = mode.outlineBlue, width = 4)
+        canvas.create_oval(mode.cx - mode.cx//2 + 150, mode.cy - mode.cy//2 + 40, mode.cx - mode.cx//2 + 170,\
+            mode.cy - mode.cy//2 + 60, fill = 'green2', outline = mode.outlineGreen, width = 4)
+        canvas.create_oval(mode.cx - mode.cx//2 + 190, mode.cy - mode.cy//2 + 40, mode.cx - mode.cx//2 + 210,\
+            mode.cy - mode.cy//2 + 60, fill = 'magenta', outline = mode.outlineMagenta, width = 4)
+
+        #Player Two
+        canvas.create_text(mode.cx - mode.cx//2, mode.cy, text = 'Enter Player Name:',\
+            fill = 'white', font = '20')
+        canvas.create_rectangle(mode.cx - mode.cx//2 + 100, mode.cy - 10,\
+            mode.cx - mode.cx//2 + 250, mode.cy + 10, fill = 'grey', outline = 'white')
+        canvas.create_text(mode.cx - mode.cx//2, mode.cy + 50, text = 'Choose Player Color:',\
+            fill = 'white', font = '20')
+        canvas.create_oval(mode.cx - mode.cx//2 + 110, mode.cy + 40, mode.cx - mode.cx//2 + 130,\
+            mode.cy + 60, fill = 'blue', outline = mode.outlineBlueTwo, width = 4)
+        canvas.create_oval(mode.cx - mode.cx//2 + 150, mode.cy + 40, mode.cx - mode.cx//2 + 170,\
+            mode.cy + 60, fill = 'green2', outline = mode.outlineGreenTwo, width = 4)
+        canvas.create_oval(mode.cx - mode.cx//2 + 190, mode.cy + 40, mode.cx - mode.cx//2 + 210,\
+            mode.cy + 60, fill = 'magenta', outline = mode.outlineMagentaTwo, width = 4)
+
+
         canvas.create_rectangle(mode.cx - 75, mode.height - 100, mode.cx + 75,\
             mode.height - 50, fill = 'dark grey', outline = 'white')
         canvas.create_text(mode.cx, mode.height - 75, text = 'Begin', fill = 'black', font = 'Helvetica 24 italic')
@@ -391,13 +736,16 @@ class PauseMenuMode(Mode):
     
     def keyPressed(mode, event):
         if(event.key == 'p'):
-            mode.app.setActiveMode(mode.app.gameMode)
+            mode.app.setActiveMode(mode.app.tutorialMode)
     
     def mousePressed(mode, event):
         clickX, clickY = event.x, event.y
         if(clickX > mode.cx - mode.cx // 4 and clickX < mode.cx + mode.cx // 4):
             if(clickY > mode.cy - 15 and clickY < mode.cy + 15):
-                mode.app.setActiveMode(mode.app.gameMode)
+                mode.app.setActiveMode(mode.app.tutorialMode)
+        if(clickX > 50 and clickX < 100):
+            if(clickY > mode.height-50 and clickY < mode.height-25):
+                mode.app.setActiveMode(mode.app.titleScreenMode)
     
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
@@ -406,6 +754,10 @@ class PauseMenuMode(Mode):
         canvas.create_rectangle(mode.cx - mode.cx//4, mode.cy - 15, mode.cx + mode.cx//4,\
             mode.cy + 15, fill = 'red', outline = 'black')
         canvas.create_text(mode.cx, mode.cy, text = 'Resume', fill = 'black', font = 'Helvetica 20 italic')
+        canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
+            outline = 'white')
+        canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
+            font = 'Helvetica 10 bold')
 
 
 '''
@@ -416,9 +768,11 @@ class MyModalApp(ModalApp):
     def appStarted(app):
         app.titleScreenMode = TitleScreenMode()
         app.overMode = GameOverMode()
-        app.gameMode = GameMode()
+        #app.gameMode = GameMode()
+        app.tutorialMode = TutorialMode()
         app.helpMode = InstructionsMode()
-        app.playerDesignMode = PlayerDesignMode()
+        app.playerDesignModeOne = PlayerDesignModeOne()
+        app.playerDesignModeTwo = PlayerDesignModeTwo()
         #app.winningMode = WinMode()
         app.pauseMode = PauseMenuMode()
         #app.cutSCreen = CutScreenMode()

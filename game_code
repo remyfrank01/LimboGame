@@ -3,17 +3,19 @@ from tkinter import *
 import random
 
 class Player(object):
-    def __init__(self, cx, cy):
+    def __init__(self, cx, cy, color):
         self.cx = cx
         self.cy = cy
         self.cyChangeRate = 10
         self.speed = 5
+        self.lives = 3
 
 class Enemy(object):
     def __init__(self, cx, cy):
         self.cx = cx
         self.cy = cy
         self.speed = 8
+        self.hp = 25
 
 
 class Wall(object):
@@ -33,10 +35,10 @@ class GameMode(Mode):
         mode.walls = []
         mode.walkCount = 0
         mode.rightKeyIsPressed = False
-        mode.stationaryAnimation = [self.loadImage('Stationary.png'), self.loadImage('walk1.png')]
-        mode.walkingRightAnimation = [self.loadImage('walk2.png'), self.loadImage('walk3.png'),\
-                self.loadImage('walk4.png'), self.loadImage('walk5.png'), self.loadImage('walk6.png'), \
-                self.loadImage('walk7.png'), self.loadImage('walk8.png')]
+        mode.stationaryAnimation = [mode.loadImage('Stationary.png'), mode.loadImage('walk1.png')]
+        mode.walkingRightAnimation = [mode.loadImage('walk2.png'), mode.loadImage('walk3.png'),\
+                mode.loadImage('walk4.png'), mode.loadImage('walk5.png'), mode.loadImage('walk6.png'), \
+                mode.loadImage('walk7.png'), mode.loadImage('walk8.png')]
         mode.currPlayerModel = mode.stationaryAnimation[0]
     
     def keyPressed(mode, event):
@@ -93,7 +95,9 @@ class GameMode(Mode):
 
 class TitleScreenMode(Mode):
     def appStarted(mode):
-        mode.displayImages = [self.loadImage('TitleScreen.png'), self.loadImage('TitleScreen2.png')]
+        mode.cx, mode.cy = mode.width//2, mode.height//2
+        mode.titleImage = mode.loadImage('LimboTitle.png')
+        mode.displayImages = [mode.loadImage('TitleScreen.png'), mode.loadImage('TitleScreen2.png')]
         mode.currImage = mode.displayImages[1]
         mode.display = mode.scaleImage(mode.currImage, .25)
     
@@ -101,7 +105,7 @@ class TitleScreenMode(Mode):
         clickX, clickY = event.x, event.y
         if(event.x >= 300 and event.x <= 400):
             if(event.y >= 200 and event.y <= 250):
-                mode.app.setActiveMode(mode.app.gameMode)
+                mode.app.setActiveMode(mode.app.playerDesignMode)
             elif(event.y >= 275 and event.y <= 325):
                 mode.app.setActiveMode(mode.app.helpMode)
             elif(event.y >= 350 and event.y <= 400):
@@ -113,22 +117,61 @@ class TitleScreenMode(Mode):
     def timerFired(mode):
         mode.currImage = mode.displayImages[1]
         changeScreen = random.randrange(100)
-        if(changeScreen > 90):
+        if(changeScreen > 95):
             mode.currImage = mode.displayImages[0]
-        mode.display = mode.scaleImage(mode.currImage, .25)
+        mode.display = mode.scaleImage(mode.currImage, .5)
     
-    def redrawAll(mode):
-        canvas.create_text(350, 100, text = 'LIMBO', font = 'Helvetica 30 bold', fill = 'white')
-        canvas.create_image(200, 450, image = ImageTk.PhotoImage(mode.display))
-        canvas.create_rectangle(300, 200, 400, 250, fill = "grey", outline = 'black', smooth = 1)
-        canvas.create_rectangle(300, 275, 400, 325, fill = "grey", outline = 'black', smooth = 1)
-        canvas.create_rectangle(300, 350, 400, 400, fill = "grey", outline = 'black', smooth = 1)
-        canvas.create_rectangle(300, 425, 400, 475, fill = "grey", outline = 'black', smooth = 1)
+    def redrawAll(mode, canvas):
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = "black")
+        canvas.create_image(mode.cx, mode.cx - mode.cx//2 - 50, image = ImageTk.PhotoImage(mode.titleImage))
+        canvas.create_image(100, 400, image = ImageTk.PhotoImage(mode.display))
+        canvas.create_polygon(300, 200, 300, 250, 400, 250, 400, 200, fill = "grey", outline = 'black', smooth = 1)
+        canvas.create_polygon(300, 275, 300, 325, 400, 325, 400, 275, fill = "grey", outline = 'black', smooth = 1)
+        canvas.create_polygon(300, 350, 300, 400, 400, 400, 400, 350, fill = "grey", outline = 'black', smooth = 1)
+        canvas.create_polygon(300, 425, 300, 475, 400, 475, 400, 425, fill = "grey", outline = 'black', smooth = 1)
         canvas.create_text(350, 225, text = 'Start Game', font = 'Helvetica 12', fill = 'black')
         canvas.create_text(350, 300, text = 'How To Play', font = 'Helvetica 12', fill = 'black')
         canvas.create_text(350, 375, text = 'High Scores', font = 'Helvetica 12', fill = 'black')
         canvas.create_text(350, 450, text = 'Wall Of Fame', font = 'Helvetica 12', fill = 'black')
+        canvas.create_line(100, 447, 200, 447, fill = 'white')
 
+class PlayerDesignMode(Mode):
+    def appStarted(mode):
+        mode.cx, mode.cy = mode.width//2, mode.height//2
+    
+    def mousePressed(mode, event):
+        clickX, clickY = event.x, event.y
+        if(clickX > mode.cx - 75 and clickX < mode.cx + 75):
+            if(clickY > mode.height - 100 and clickY < mode.height - 50):
+                mode.app.setActiveMode(mode.app.gameMode)
+        if(clickX > 50 and clickX < 100):
+            if(clickY > mode.height-50 and clickY < mode.height-25):
+                mode.app.setActiveMode(mode.app.titleScreenMode)
+
+    def redrawAll(mode, canvas):
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
+        canvas.create_text(mode.cx - mode.cx//2, mode.cy - mode.cy//2, text = 'Enter Player Name:',\
+            fill = 'white', font = '20')
+        canvas.create_rectangle(mode.cx - mode.cx//2 + 100, mode.cy - mode.cy//2 - 10,\
+            mode.cx - mode.cx//2 + 250, mode.cy - mode.cy//2 + 10, fill = 'grey', outline = 'white')
+        canvas.create_text(mode.cx - mode.cx//2, mode.cy - mode.cy//2 + 50, text = 'Choose Player Color:',\
+            fill = 'white', font = '20')
+        canvas.create_oval(mode.cx - mode.cx//2 + 110, mode.cy - mode.cy//2 + 40, mode.cx - mode.cx//2 + 130,\
+            mode.cy - mode.cy//2 + 60, fill = 'blue', outline = 'grey')
+        canvas.create_oval(mode.cx - mode.cx//2 + 150, mode.cy - mode.cy//2 + 40, mode.cx - mode.cx//2 + 170,\
+            mode.cy - mode.cy//2 + 60, fill = 'green', outline = 'grey')
+        canvas.create_oval(mode.cx - mode.cx//2 + 190, mode.cy - mode.cy//2 + 40, mode.cx - mode.cx//2 + 210,\
+            mode.cy - mode.cy//2 + 60, fill = 'magenta', outline = 'grey')
+        canvas.create_rectangle(mode.cx - 75, mode.height - 100, mode.cx + 75,\
+            mode.height - 50, fill = 'dark grey', outline = 'white')
+        canvas.create_text(mode.cx, mode.height - 75, text = 'Begin', fill = 'white', font = 'Helvetica 24 italic')
+        canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
+            outline = 'white')
+        canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
+            font = 'Helvetica 10 bold')
+
+
+'''
 class WallOfFameMode(Mode):
     def appStarted(mode):
     def mousePressed(mode):
@@ -140,25 +183,51 @@ class WallOfFameMode(Mode):
     def drawPlayer(mode):
     
     def redrawAll(mode):
+'''
 
 class HighScoresMode(Mode):
     def appStarted(mode):
+        mode.cx, mode.cy = mode.width//2, mode.height//2
     
-    def mousePressed(mode):
+    def mousePressed(mode, event):
+        clickX, clickY = event.x, event.y
+        if(clickX > 50 and clickX < 100):
+            if(clickY > mode.height-50 and clickY < mode.height-25):
+                mode.app.setActiveMode(mode.app.titleScreenMode)
     
-    def drawScores(mode):
-    
-    def redrawAll(mode):
+    def redrawAll(mode, canvas):
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
+        canvas.create_text(mode.cx, mode.cy - mode.cy//2 - 75, text = 'High Scores', fill = "white",\
+            font = 'Helvetica 30 bold')
+        canvas.create_text(mode.cx - mode.cx//2, 150, text = '1.', fill = "white",\
+            font = 'Helvetica 25 bold')
+        canvas.create_text(mode.cx - mode.cx//2, 225, text = '2.', fill = "white",\
+            font = 'Helvetica 25 bold')
+        canvas.create_text(mode.cx - mode.cx//2, 300, text = '3.', fill = "white",\
+            font = 'Helvetica 25 bold')
+        canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
+            outline = 'white')
+        canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
+            font = 'Helvetica 10 bold')
 
 class GameOverMode(Mode):
     def appStarted(mode):
+        mode.cx, mode.cy = mode.width//2, mode.height//2
     
-    def keyPressed(mode):
-    
-    def timerFired(mode):
-    
-    def redrawAll(mode):
+    def mousePressed(mode, event):
+        clickX, clickY = event.x, event.y
+        if(clickX > 50 and clickX < 100):
+            if(clickY > mode.height-50 and clickY < mode.height-25):
+                mode.app.setActiveMode(mode.app.titleScreenMode)
 
+    def redrawAll(mode, canvas):
+        canvas.create_text(mode.cx - mode.cx//2, mode.cy - mode.cy//2, text = "Game Over",\
+            font = 'Helvetica 30 bold', fill ='red')
+        canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
+            outline = 'white')
+        canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
+            font = 'Helvetica 10 bold')
+'''
 class CutScreen(Mode):
     def appStarted(mode):
 
@@ -167,37 +236,66 @@ class CutScreen(Mode):
     def timerFired(mode):
     
     def redrawAll(mode):
-
+'''
 class InstructionsMode(Mode):
     def appStarted(mode):
+        mode.cx, mode.cy = mode.width//2, mode.height//2
+        mode.upKey = mode.scaleImage(mode.loadImage('UpKey.png'), .5)
+        mode.rightKey = mode.scaleImage(mode.loadImage('RightKey.png'), .5)
+        mode.leftKey = mode.scaleImage(mode.loadImage('LeftKey.png'), .5)
+        mode.spaceBar = mode.scaleImage(mode.loadImage('SpaceBar.png'), .5)
     
-    def keyPressed(mode):
+    def mousePressed(mode, event):
+        clickX, clickY = event.x, event.y
+        if(clickX > 50 and clickX < 100):
+            if(clickY > mode.height-50 and clickY < mode.height-25):
+                mode.app.setActiveMode(mode.app.titleScreenMode)
     
-    def redrawAll(mode):
-
+    def redrawAll(mode, canvas):
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
+        canvas.create_text(mode.cx, mode.cy - mode.cy//2 - 75, text = 'Instructions:', fill = "white",\
+            font = 'Helvetica 30 bold')
+        canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
+            outline = 'white')
+        canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
+            font = 'Helvetica 10 bold')
+        canvas.create_image(mode.cx - mode.cx//2 + 50, 150, image = ImageTk.PhotoImage(mode.upKey))
+        canvas.create_image(mode.cx - mode.cx//2 + 50, 225, image = ImageTk.PhotoImage(mode.rightKey))
+        canvas.create_image(mode.cx - mode.cx//2 + 50, 300, image = ImageTk.PhotoImage(mode.leftKey))
+        canvas.create_image(mode.cx - mode.cx//2 + 50, 375, image = ImageTk.PhotoImage(mode.spaceBar))
+        canvas.create_text(mode.cx, 150, text = 'Press Up to jump',\
+            font = 'Helvetica 10', fill = 'white')
+        canvas.create_text(mode.cx + 25, 225, text = 'Press Right to move the player right',\
+            font = 'Helvetica 10', fill = 'white')
+        canvas.create_text(mode.cx + 25, 300, text = 'Press Left to move the player right',\
+            font = 'Helvetica 10', fill = 'white')
+        canvas.create_text(mode.cx + 50, 375, text = 'Press Space to shoot enemies',\
+            font = 'Helvetica 10', fill = 'white')
+'''
 class PauseMenuMode(Mode):
     def appStarted(mode):
     
     def timerFired(mode):
     
     def redrawAll(mode):
-
+'''
+'''
 class WinMode(Mode):
     def appStarted(mode):
-
+'''
 class MyModalApp(ModalApp):
     def appStarted(app):
         app.titleScreenMode = TitleScreenMode()
         app.overMode = GameOverMode()
         app.gameMode = GameMode()
         app.helpMode = InstructionsMode()
-        app.winningMode = WinMode()
-        app.pauseMode = PauseMenuMode()
-        app.cutSCreen = CutScreenMode()
+        app.playerDesignMode = PlayerDesignMode()
+        #app.winningMode = WinMode()
+        #app.pauseMode = PauseMenuMode()
+        #app.cutSCreen = CutScreenMode()
         app.highScores = HighScoresMode()
-        app.wallOfFame = WallOfFameMode()
+        #app.wallOfFame = WallOfFameMode()
         app.setActiveMode(app.titleScreenMode)
         app.timerDelay = 40
 
-app = MyModalApp(width=500, height=700)
-    
+app = MyModalApp(width=700, height=500)

@@ -30,7 +30,7 @@ class Wall(object):
 
 class Bullet(object):
     bullets = []
-    cyChangeRate = .5
+    cyChangeRate = .3
 
     def __init__(self, cx, cy, color, speed):
         self.cx = cx
@@ -108,6 +108,8 @@ class TutorialMode(Mode):
                 mode.scaleImage(mode.loadImage('walkLeft6.png'), .3),\
                 mode.scaleImage(mode.loadImage('walkLeft7.png'), .3),\
                 mode.scaleImage(mode.loadImage('walkLeft8.png'), .3)]
+        
+        mode.backgroundImage = mode.scaleImage(mode.loadImage('cityScape.png'), 2)
         
         mode.currPlayerOneModel = mode.stationaryAnimationRight[0]
         mode.createBird = False
@@ -309,6 +311,7 @@ class TutorialMode(Mode):
                     Press [Left / a] to go left\n
                     Press [Up / w] to jump\n
                     Press [Space / Tab] to shoot enemy players'''
+        canvas.create_image(mode.width//2, mode.height//2 + 32, image = ImageTk.PhotoImage(mode.backgroundImage))
         canvas.create_text(mode.width//2, mode.height//2 - mode.height//4, text = 'Tutorial Mode',\
             font = 'System 30 bold', fill = 'white')
         canvas.create_text(mode.width//2, mode.height//2, text = instructions,\
@@ -353,11 +356,11 @@ class TutorialMode(Mode):
 
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
+        mode.drawBackground(canvas)
         canvas.create_rectangle(0, 475, mode.width, mode.height, fill = 'black')
         mode.drawBirds(canvas)
         mode.drawPlayers(canvas)
         mode.drawPlayerIdentifiers(canvas)
-        mode.drawBackground(canvas)
         mode.drawProjectiles(canvas)
 
 class TitleScreenMode(Mode):
@@ -551,7 +554,7 @@ class PlayerDesignModeTwo(Mode):
         #green circle
         if(clickX > mode.cx - mode.cx//2 + 150 and clickX < mode.cx - mode.cx//2 + 170):
             if(clickY > mode.cy - mode.cy//2 + 40 and clickY < mode.cy - mode.cy//2 + 60):
-                mode.color1 = 'green'
+                mode.color1 = 'green2'
                 mode.outlineGreen = 'white'
                 mode.outlineBlue = 'black'
                 mode.outlineMagenta = 'black'
@@ -575,7 +578,7 @@ class PlayerDesignModeTwo(Mode):
         #green circle two
         if(clickX > mode.cx - mode.cx//2 + 150 and clickX < mode.cx - mode.cx//2 + 170):
             if(clickY > mode.cy + 40 and clickY < mode.cy + 60):
-                mode.color2 = 'green'
+                mode.color2 = 'green2'
                 mode.outlineGreenTwo = 'white'
                 mode.outlineBlueTwo = 'black'
                 mode.outlineMagentaTwo = 'black'

@@ -4,6 +4,9 @@ import random
 import json
 import requests
 
+#This program makes use of code from the 15-112 webiste to be able to run the animations.
+#Source: https://www.cs.cmu.edu/~112/notes/notes-animations-part1.html
+
 class jsonStoredData(object):
     url = 'https://api.myjson.com/bins/zrkyi'
     source = requests.get(url)
@@ -13,6 +16,9 @@ class jsonStoredData(object):
     requests.put(url, data = json.dumps(data), headers = headers)
 
 
+#This class creates a graphical user interface to allow the player(s) to enter a team name
+#and then checks that team name with existing team names stored in a jstor file online.
+#The use of GUI and some of this code is inspired by: https://www.youtube.com/watch?v=RTM9tiV_HoY
 class LoginInfo(object):
     teamName = ''
     
@@ -65,7 +71,7 @@ class Player(object):
         self.cy = cy
         self.color = color
         self.points = points
-        Player.players += [(self.cx, self.cy, self.color, Player.hp)]
+        Player.players += [(self.cx, self.cy, self.color)]
 
 class Enemy(object):
     enemies = []
@@ -110,8 +116,16 @@ class TutorialMode(Mode):
         mode.playerNum = len(Player.players)
         mode.enemiesNum = len(Enemy.enemies)
 
+        mode.playersRemaining = 1
+        if(mode.playerNum == 2):
+            mode.playersRemaining = 2
+
         mode.oneIsFacingRight = True
         mode.twoIsFacingRight = True
+
+        mode.oneIsDead = False
+        if(mode.playerNum == 2):
+            mode.twoIsDead = False
 
         #Enemies
         mode.enemies = []
@@ -146,7 +160,6 @@ class TutorialMode(Mode):
         mode.isPaused = False
         mode.scrollY = 0
         mode.scrollX = 0
-        mode.points = 0
         mode.walls = []
         mode.walkCountOne = 0
         mode.walkCountTwo = 0
@@ -329,7 +342,11 @@ class TutorialMode(Mode):
         for enemy in Enemy.enemies:
             if(enemy[4] <= 0):
                 mode.enemiesNum -= 1
+                mode.streak += 1
+                mode.onStreak = True
                 Enemy.enemies.remove(enemy)
+                mode.score += (10 * mode.streak)
+                mode.enemiesKilled += 1
             enemy[1] += Enemy.cyChangeRate
             enemyJumps = random.randrange(100)
             if(enemyJumps >= 99 and mode.enemyJumpCount < 2):
@@ -398,14 +415,16 @@ class TutorialMode(Mode):
         
         if(mode.gameWon):
             mode.gameWon = False
-            mode.points = 0
+            mode.dictOfTeam = {Team.teamNames: mode.score}
+            mode.score = 0
             mode.cx = mode.width//2
             mode.cy = mode.height//2
             mode.app.setActiveMode(mode.app.winningMode)
             return
         if(mode.isGameOver):
             mode.isGameOver = False
-            mode.points = 0
+            mode.dictOfTeam = {Team.teamNames: mode.score}
+            mode.score = 0
             mode.cx = mode.width//2
             mode.cy = mode.height//2
             mode.app.setActiveMode(mode.app.overMode)
@@ -470,16 +489,22 @@ class TutorialMode(Mode):
     
     def checkEnemyAttack(mode):
         for enemy in Enemy.enemies:
-            if(enemy[0] + 20 > mode.playerOneCx - 10 and enemy[3] and enemy[1] + 10 < mode.playerOneCy):
+            if(abs(enemy[0] - mode.playerOneCx) < 40 and enemy[1] + 10 < mode.playerOneCy):
                 mode.playerOneHp -= 2
-            elif(enemy[0] - 20 < mode.playerOneCx + 10 and not enemy[3] and enemy[1] + 10 < mode.playerOneCy):
-                mode.playerOneHp -= 2
+                if(mode.playerOneHp < 0):
+                    mode.playerOneLives -= 1
+                    mode.playerOneHp = 100
+                mode.onStreak = False
+                mode.streak = 0
             
             if(mode.playerNum > 1):
-                if(enemy[0] + 20 > mode.playerTwoCx - 10 and enemy[3] and enemy[1] + 10 < mode.playerTwoCy):
+                if(abs(enemy[0] - mode.playerTwoCx) < 40 and enemy[1] + 10 < mode.playerTwoCy):
                     mode.playerTwoHp -= 2
-                elif(enemy[0] - 20 < mode.playerTwoCx + 10 and not enemy[3] and enemy[1] + 10 < mode.playerTwoCy):
-                    mode.playerTwoHp -= 2
+                    if(mode.playerTwoHp < 0):
+                        mode.playerTwoLives -= 1
+                        mode.playerTwoHp = 100
+                    mode.onStreak = False
+                    mode.streak = 0
 
     def drawWorld(mode, canvas):
         pass
@@ -540,11 +565,24 @@ class TutorialMode(Mode):
             canvas.create_oval(bullet[0] - mode.bulletRadius, bullet[1] - mode.bulletRadius,\
                 bullet[0] + mode.bulletRadius, bullet[1] + mode.bulletRadius, fill = bullet[2],\
                     outline = 'black')
+    
+    def drawScore(mode, canvas):
+        canvas.create_text(mode.width//2, 35, text = f'Score: {mode.score}', fill = 'white', font = 'System 20')
+    
+    def drawHp(mode, canvas):
+        canvas.create_rectangle(20, 10, 120, 30, fill = None, outline = 'white')
+        canvas.create_rectangle(20, 12, 20 + mode.playerOneHp, 28, fill = mode.playerOneColor)
+
+        if(mode.playerNum == 2):
+            canvas.create_rectangle(mode.width - 120, 10, mode.width - 20, 30, fill = None, outline = 'white')
+            canvas.create_rectangle(mode.width - (mode.playerTwoHp + 20) , 12, mode.width - 20, 28, fill = mode.playerTwoColor)
 
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
         mode.drawBackground(canvas)
         canvas.create_rectangle(0, 475, mode.width, mode.height, fill = 'black')
+        mode.drawScore(canvas)
+        mode.drawHp(canvas)
         mode.drawBirds(canvas)
         mode.drawPlayers(canvas)
         mode.drawPlayerIdentifiers(canvas)
@@ -962,3 +1000,4 @@ class MyModalApp(ModalApp):
 
 LoginInfo()
 app = MyModalApp(width=700, height=500)
+

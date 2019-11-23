@@ -122,6 +122,7 @@ class Score(object):
 
 class TutorialMode(Mode):
     def appStarted(mode):
+        TitleScreenMode.scoresViewable = True
         mode.playerNum = len(Player.players)
         mode.enemiesNum = len(Enemy.enemies)
 
@@ -641,11 +642,17 @@ class TutorialMode(Mode):
         mode.drawProjectiles(canvas)
 
 class TitleScreenMode(Mode):
+    scoresViewable = False
+
     def appStarted(mode):
         mode.cx, mode.cy = mode.width//2, mode.height//2
         mode.titleImage = mode.loadImage('LimboTitle.png')
         mode.displayImages = [mode.loadImage('TitleScreen.png'), mode.loadImage('TitleScreen2.png')]
         mode.displayImagesTwo = [mode.loadImage('TitleScreenLeft.png'), mode.loadImage('TitleScreenLeft2.png')]
+
+        mode.sadLock = mode.scaleImage(mode.loadImage('sadLock.png'), .15)
+        mode.happyLock = mode.scaleImage(mode.loadImage('happyLock.png'), .15)
+
         mode.currImage = mode.displayImages[1]
         mode.currImageTwo = mode.displayImagesTwo[1]
         mode.display = mode.scaleImage(mode.currImage, .25)
@@ -671,7 +678,7 @@ class TitleScreenMode(Mode):
                     mode.app.setActiveMode(mode.app.playerDesignModeTwo)
             elif(clickY >= 275 and clickY <= 325):
                 mode.app.setActiveMode(mode.app.helpMode)
-            elif(clickY >= 350 and clickY <= 400):
+            elif(clickY >= 350 and clickY <= 400 and TitleScreenMode.scoresViewable):
                 mode.app.setActiveMode(mode.app.highScores)
             elif(clickY >= 425 and clickY <= 475):
                 mode.app.setActiveMode(mode.app.wallOfFame)
@@ -716,12 +723,19 @@ class TitleScreenMode(Mode):
         else:
             canvas.create_image(100, 400, image = ImageTk.PhotoImage(mode.display))
             canvas.create_line(100, 447, 200, 447, fill = 'white')
+    
+    def drawLock(mode, canvas):
+        if(TitleScreenMode.scoresViewable):
+            canvas.create_image(280, 375, image = ImageTk.PhotoImage(mode.happyLock))
+        else:
+            canvas.create_image(280, 375, image = ImageTk.PhotoImage(mode.sadLock))
 
     
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = "black")
         mode.drawPlayerButtons(canvas)
         mode.drawPlayersOnScreen(canvas)
+        mode.drawLock(canvas)
         canvas.create_image(mode.cx, mode.cy - mode.cy//2, image = ImageTk.PhotoImage(mode.titleImage))
         canvas.create_text(mode.cx, mode.cy - mode.cy//3 - 10, text = '8-bit Version', fill = 'white',\
             font = 'System 2')
@@ -729,10 +743,10 @@ class TitleScreenMode(Mode):
         canvas.create_polygon(300, 275, 300, 325, 400, 325, 400, 275, fill = "grey", outline = 'black', smooth = 1)
         canvas.create_polygon(300, 350, 300, 400, 400, 400, 400, 350, fill = "grey", outline = 'black', smooth = 1)
         canvas.create_polygon(300, 425, 300, 475, 400, 475, 400, 425, fill = "grey", outline = 'black', smooth = 1)
-        canvas.create_text(350, 225, text = 'Start Game', font = 'Helvetica 12', fill = 'black')
-        canvas.create_text(350, 300, text = 'How To Play', font = 'Helvetica 12', fill = 'black')
-        canvas.create_text(350, 375, text = 'High Scores', font = 'Helvetica 12', fill = 'black')
-        canvas.create_text(350, 450, text = 'Wall Of Fame', font = 'Helvetica 12', fill = 'black')
+        canvas.create_text(350, 225, text = 'Start Game', font = 'System 12', fill = 'black')
+        canvas.create_text(350, 300, text = 'How To Play', font = 'System 12', fill = 'black')
+        canvas.create_text(350, 375, text = 'High Scores', font = 'System 12', fill = 'black')
+        canvas.create_text(350, 450, text = 'Wall Of Fame', font = 'System 12', fill = 'black')
 
 class PlayerDesignModeOne(Mode):
     def appStarted(mode):
@@ -788,11 +802,11 @@ class PlayerDesignModeOne(Mode):
             mode.cy - mode.cy//2 + 60, fill = 'magenta', outline = mode.outlineMagenta, width = 4)
         canvas.create_rectangle(mode.cx - 75, mode.height - 100, mode.cx + 75,\
             mode.height - 50, fill = 'dark grey', outline = 'white')
-        canvas.create_text(mode.cx, mode.height - 75, text = 'Begin', fill = 'black', font = 'Helvetica 24 italic')
+        canvas.create_text(mode.cx, mode.height - 75, text = 'Begin', fill = 'black', font = 'System 24 italic')
         canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
             outline = 'white')
         canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
-            font = 'Helvetica 10 bold')
+            font = 'System 10 bold')
 
 class PlayerDesignModeTwo(Mode):
     def appStarted(mode):
@@ -891,11 +905,11 @@ class PlayerDesignModeTwo(Mode):
 
         canvas.create_rectangle(mode.cx - 75, mode.height - 100, mode.cx + 75,\
             mode.height - 50, fill = 'dark grey', outline = 'white')
-        canvas.create_text(mode.cx, mode.height - 75, text = 'Begin', fill = 'black', font = 'Helvetica 24 italic')
+        canvas.create_text(mode.cx, mode.height - 75, text = 'Begin', fill = 'black', font = 'System 24 italic')
         canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
             outline = 'white')
         canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
-            font = 'Helvetica 10 bold')
+            font = 'System 10 bold')
 
 
 '''
@@ -911,6 +925,14 @@ class WallOfFameMode(Mode):
     
     def redrawAll(mode):
 '''
+#This code makes use of JSON which is a way of storing data in a file
+#or in this case on a website (source) to be accessible for future references.
+#The use of json was mde possible by lessons from:
+
+#https://www.w3schools.com/python/python_json.asp
+
+#While no code was take directly, I only found it fair to cite the source of
+#knowledge since it was not covered in 15-112.
 
 class HighScoresMode(Mode):
     def appStarted(mode):
@@ -956,27 +978,27 @@ class HighScoresMode(Mode):
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
         canvas.create_text(mode.cx, mode.cy - mode.cy//2 - 75, text = 'High Scores', fill = "white",\
-            font = 'Helvetica 30 bold')
+            font = 'System 30 bold')
         canvas.create_text(mode.cx - mode.cx//2, 150, text = '1.', fill = "white",\
-            font = 'Helvetica 25 bold')
+            font = 'System 25 bold')
         canvas.create_text(mode.cx, 150, text = mode.topPlayer, fill = 'white', font = 'System 30')
         canvas.create_text(mode.cx + mode.cx//2, 150, text = mode.topScore, fill = 'white', font = 'System 30')
 
 
         canvas.create_text(mode.cx - mode.cx//2, 225, text = '2.', fill = "white",\
-            font = 'Helvetica 25 bold')
+            font = 'System 25 bold')
         canvas.create_text(mode.cx, 225, text = mode.secondPlayer, fill = 'white', font = 'System 30')
         canvas.create_text(mode.cx + mode.cx//2, 225, text = mode.secondScore, fill = 'white', font = 'System 30')
 
         canvas.create_text(mode.cx - mode.cx//2, 300, text = '3.', fill = "white",\
-            font = 'Helvetica 25 bold')
+            font = 'System 25 bold')
         canvas.create_text(mode.cx, 300, text = mode.thirdPlayer, fill = 'white', font = 'System 30')
-        canvas.create_text(mode.cx + mode.cx//2, 300, text = mode.thirdScore, fill = 'white', font = 'Helvetica 30')
+        canvas.create_text(mode.cx + mode.cx//2, 300, text = mode.thirdScore, fill = 'white', font = 'System 30')
 
         canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
             outline = 'white')
         canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
-            font = 'Helvetica 10 bold')
+            font = 'System 10 bold')
 
 class GameOverMode(Mode):
     def appStarted(mode):
@@ -984,18 +1006,18 @@ class GameOverMode(Mode):
     
     def mousePressed(mode, event):
         clickX, clickY = event.x, event.y
-        if(clickX > mode.cx-25 and clickX < mode.cx+25):
-            if(clickY > mode.cy-15 and clickY < mode.cy+15):
+        if(clickX > mode.cx-50 and clickX < mode.cx+50):
+            if(clickY > mode.cy-25 and clickY < mode.cy+25):
                 mode.app.setActiveMode(mode.app.highScores)
 
     def redrawAll(mode, canvas):
-        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey24')
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
         canvas.create_text(mode.cx, mode.cy - mode.cy//2, text = "Game Over",\
-            font = 'Helvetica 30 bold', fill ='red')
-        canvas.create_rectangle(mode.cx - 25, mode.cy - 15, mode.cx + 25, mode.cy + 15, fill = 'red',\
+            font = 'System 30 bold', fill ='red')
+        canvas.create_rectangle(mode.cx - 50, mode.cy - 25, mode.cx + 50, mode.cy + 25, fill = 'red',\
             outline = 'white')
-        canvas.create_text(mode.cx, mode.cy, text = 'View Scores', fill = 'black',\
-            font = 'System 10 bold')
+        canvas.create_text(mode.cx, mode.cy, text = 'View Scores', fill = 'white',\
+            font = 'System 10')
 '''
 class CutScreen(Mode):
     def appStarted(mode):
@@ -1023,23 +1045,23 @@ class InstructionsMode(Mode):
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
         canvas.create_text(mode.cx, mode.cy - mode.cy//2 - 75, text = 'Instructions:', fill = "white",\
-            font = 'Helvetica 30 bold')
+            font = 'System 30 bold')
         canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
             outline = 'white')
         canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
-            font = 'Helvetica 10 bold')
+            font = 'System 10 bold')
         canvas.create_image(mode.cx - mode.cx//2 + 50, 150, image = ImageTk.PhotoImage(mode.upKey))
         canvas.create_image(mode.cx - mode.cx//2 + 50, 225, image = ImageTk.PhotoImage(mode.rightKey))
         canvas.create_image(mode.cx - mode.cx//2 + 50, 300, image = ImageTk.PhotoImage(mode.leftKey))
         canvas.create_image(mode.cx - mode.cx//2 + 50, 375, image = ImageTk.PhotoImage(mode.spaceBar))
         canvas.create_text(mode.cx, 150, text = 'Press Up to jump',\
-            font = 'Helvetica 12', fill = 'white')
+            font = 'System 12', fill = 'white')
         canvas.create_text(mode.cx + 25, 225, text = 'Press Right to move the player right',\
-            font = 'Helvetica 12', fill = 'white')
+            font = 'System 12', fill = 'white')
         canvas.create_text(mode.cx + 25, 300, text = 'Press Left to move the player right',\
-            font = 'Helvetica 12', fill = 'white')
+            font = 'System 12', fill = 'white')
         canvas.create_text(mode.cx + 50, 375, text = 'Press Space to shoot enemies',\
-            font = 'Helvetica 12', fill = 'white')
+            font = 'System 12', fill = 'white')
 
 class PauseMenuMode(Mode):
     def appStarted(mode):
@@ -1061,14 +1083,14 @@ class PauseMenuMode(Mode):
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
         canvas.create_text(mode.cx, mode.cy - mode.cy//2 - 75, text = 'PAUSED', fill = "black",\
-            font = 'Helvetica 30 bold')
+            font = 'System 30 bold')
         canvas.create_rectangle(mode.cx - mode.cx//4, mode.cy - 15, mode.cx + mode.cx//4,\
             mode.cy + 15, fill = 'red', outline = 'black')
-        canvas.create_text(mode.cx, mode.cy, text = 'Resume', fill = 'black', font = 'Helvetica 20 italic')
+        canvas.create_text(mode.cx, mode.cy, text = 'Resume', fill = 'black', font = 'System 20 italic')
         canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
             outline = 'white')
         canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
-            font = 'Helvetica 10 bold')
+            font = 'System 10 bold')
 
 
 '''
@@ -1090,7 +1112,7 @@ class MyModalApp(ModalApp):
         app.highScores = HighScoresMode()
         #app.wallOfFame = WallOfFameMode()
         app.setActiveMode(app.titleScreenMode)
-        app.timerDelay = 30
+        app.timerDelay = 20
 
 LoginInfo()
 

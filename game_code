@@ -13,6 +13,7 @@ import requests
 #This class creates a graphical user interface to allow the player(s) to enter a team name
 #and then checks that team name with existing team names stored in a jstor file online.
 #The use of GUI and some of this code is inspired by: https://www.youtube.com/watch?v=RTM9tiV_HoY
+#(mainly for syntax purposes since I don't know the syntax for making a GUI in Python)
 class LoginInfo(object):
     teamName = ''
     proceed = True
@@ -83,6 +84,7 @@ class Enemy(object):
     enemies = []
     speed = 5
     cyChangeRate = 10
+    jumpCount = 0
 
     def __init__(self, cx, cy, enemyWalkCount = 0, facingRight = True, hp = 16):
         self.cx = cx
@@ -90,7 +92,7 @@ class Enemy(object):
         self.enemyWalkCount = enemyWalkCount
         self.isFacingRight = facingRight
         self.hp = hp
-        Enemy.enemies += [[self.cx, self.cy, self.enemyWalkCount, self.isFacingRight, self.hp]]
+        Enemy.enemies += [[self.cx, self.cy, self.enemyWalkCount, self.isFacingRight, self.hp, Enemy.jumpCount]]
 
 
 class Wall(object):
@@ -119,6 +121,18 @@ class Bird(object):
 
 class Score(object):
     score = 0
+
+class dataCollection(object):
+    jumpDistances = []
+    #This value for average is an estimated assumption of the distance a player will jump from the enemy
+    #It is highly innacurate at first so the enemy will get progressively harder the more the game is played
+    average = 200
+
+    def __init__(self, jumpDistance):
+        self.jumpDistance = jumpDistance
+        dataCollection.jumpDistances += [self.jumpDistance]
+        self.total = sum(dataCollection.jumpDistances)
+        dataCollection.average = self.total / len(dataCollection.jumpDistances)
 
 class TutorialMode(Mode):
     def appStarted(mode):
@@ -219,7 +233,6 @@ class TutorialMode(Mode):
                 mode.scaleImage(mode.loadImage('enemyLeft4.png'), .4)]
         
         mode.currEnemyModel = mode.enemyStationaryAnimationRight
-        mode.enemyJumpCount = 0
         
         mode.backgroundImage = mode.scaleImage(mode.loadImage('cityScape.png'), 2)
         
@@ -246,10 +259,12 @@ class TutorialMode(Mode):
     
     def keyPressed(mode, event):
         if(event.key == "Up" and mode.playerOneJumpCount < 2 and mode.oneIsJumping == False and not mode.oneIsDead):
+            mode.getDistanceFromEnemyOne()
             mode.playerOneCy -= 75
             mode.playerOneJumpCount += 1
             mode.oneIsJumping = True
         elif(event.key == 'w' and mode.playerNum == 2 and mode.playerTwoJumpCount < 2 and mode.twoIsJumping == False and not mode.twoIsDead):
+            mode.getDistanceFromEnemyTwo()
             mode.playerTwoCy -= 75
             mode.playerTwoJumpCount += 1
             mode.twoIsJumping = True
@@ -361,16 +376,23 @@ class TutorialMode(Mode):
                 mode.enemiesKilled += 1
             enemy[1] += Enemy.cyChangeRate
             enemyJumps = random.randrange(100)
-            if(enemyJumps >= 99 and mode.enemyJumpCount < 2):
-                mode.enemyJumpCount += 1
-                enemy[1] -= 100
-            distFromTwo = 0
             distFromOne = enemy[0] - mode.playerOneCx
+
+            if(abs(distFromOne) < dataCollection.average+5 and abs(distFromOne) > dataCollection.average-5 and enemy[5] < 2):
+                enemy[5] += 1
+                enemy[1] -= 100
+
+            distFromTwo = 0
             if(mode.playerNum > 1):
                 distFromTwo = enemy[0] - mode.playerTwoCx
+            if(abs(distFromTwo) < dataCollection.average+5 and abs(distFromTwo) > dataCollection.average-5 and enemy[5] < 2):
+                enemy[5] += 1
+                enemy[1] -= 100
+
             target = min(abs(distFromOne), abs(distFromTwo))
             if(mode.playerNum == 1):
                 target = abs(distFromOne)
+
             if(target == abs(distFromOne) and distFromOne < 0):
                 enemy[3] = True
                 enemy[0] += Enemy.speed
@@ -527,9 +549,32 @@ class TutorialMode(Mode):
     def checkEnemyBounds(mode):
         for enemy in Enemy.enemies:
             if(enemy[1] + 70 >= mode.height):
-                mode.enemyJumpCount = 0
+                enemy[5] = 0
                 enemy[1] = mode.height - 70
     
+    def getDistanceFromEnemyOne(mode):
+        #The takeDataPoint value here determines whether or not we send the data to the dataCollection class.
+        #This slows down the rate at which the enemy learns. Making it so the difficulty of the game progresses
+        #as it is played more.
+
+        takeDataPoint = random.randrange(100)
+        if(takeDataPoint >= 90):
+            for enemy in Enemy.enemies:
+                if(mode.playerOneCx < enemy[0] and mode.oneIsFacingRight):
+                    dataCollection(enemy[0] - mode.playerOneCx)
+                elif(mode.playerOneCx > enemy[0] and mode.oneIsFacingRight == False):
+                    dataCollection(mode.playerOneCx - enemy[0])
+
+    def getDistanceFromEnemyTwo(mode):
+        takeDataPoint = random.randrange(100)
+        if(takeDataPoint >= 90):
+            for enemy in Enemy.enemies:
+                if(mode.playertwoCx < enemy[0] and mode.twoIsFacingRight):
+                    dataCollection(enemy[0] - mode.playerTwoCx)
+                elif(mode.playerTwoCx > enemy [0] and mode.twoIsFacingRight == False):
+                    dataCollection(mode.playerTwoCx - enemy[0])
+
+
     def checkBulletHits(mode):
         #bullet[0]=cx , bullet[1]=cy
         for enemy in Enemy.enemies:
@@ -1118,4 +1163,5 @@ LoginInfo()
 
 if(LoginInfo.proceed):
     app = MyModalApp(width=700, height=500)
+
 

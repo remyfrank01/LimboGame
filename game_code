@@ -7,13 +7,7 @@ import requests
 #This program makes use of code from the 15-112 webiste to be able to run the animations.
 #Source: https://www.cs.cmu.edu/~112/notes/notes-animations-part1.html
 
-class jsonStoredData(object):
-    url = 'https://api.myjson.com/bins/zrkyi'
-    source = requests.get(url)
-    data = json.loads(source.text)
-    headers = {'Content-Type':'application/json'}
-    #data.update({'GavinSux': -1})
-    requests.put(url, data = json.dumps(data), headers = headers)
+
 
 
 #This class creates a graphical user interface to allow the player(s) to enter a team name
@@ -21,6 +15,7 @@ class jsonStoredData(object):
 #The use of GUI and some of this code is inspired by: https://www.youtube.com/watch?v=RTM9tiV_HoY
 class LoginInfo(object):
     teamName = ''
+    proceed = True
     
     def __init__(self):
         self.login = Tk()
@@ -40,16 +35,28 @@ class LoginInfo(object):
         self.enter = Button(self.canvas, text = 'Enter', command = self.quit)
         self.enter.pack(side = RIGHT)
 
+        self.login.protocol("WM_DELETE_WINDOW", self.exitFrame)
+
         self.login.mainloop()
 
     def quit(self):
+        listOfChars = []
         LoginInfo.teamName = self.nameEntry.get()
-        if(LoginInfo.teamName not in jsonStoredData.data):
+        for i in range(len(LoginInfo.teamName)):
+            listOfChars += LoginInfo.teamName[i]
+        if(len(listOfChars) == 1):
+            self.noName = Label(self.canvas, text = 'Not a valid name', font = 'System', fg = 'red')
+            self.noName.pack(side = BOTTOM)
+        elif(type(LoginInfo.teamName) == str):
             Team(LoginInfo.teamName)
             self.login.destroy()
         else:
             self.errorLabel = Label(self.canvas, text = 'That name has been taken', font = 'System', fg = 'red')
             self.errorLabel.pack(side = BOTTOM)
+    
+    def exitFrame(self):
+        LoginInfo.proceed = False
+        self.login.destroy()
 
 class Team(object):
     teamNames = ''
@@ -66,11 +73,10 @@ class Player(object):
     lives = 3
     cyChangeRate = 10
 
-    def __init__(self, cx, cy, color, points= 0):
+    def __init__(self, cx, cy, color):
         self.cx = cx
         self.cy = cy
         self.color = color
-        self.points = points
         Player.players += [(self.cx, self.cy, self.color)]
 
 class Enemy(object):
@@ -110,6 +116,9 @@ class Bird(object):
         self.cx = cx
         self.cy = random.randrange(50, 200)
         self.changeX = changeX
+
+class Score(object):
+    score = 0
 
 class TutorialMode(Mode):
     def appStarted(mode):
@@ -235,20 +244,20 @@ class TutorialMode(Mode):
             mode.currPlayerTwoModel = mode.stationaryAnimationRight[0]
     
     def keyPressed(mode, event):
-        if(event.key == "Up" and mode.playerOneJumpCount < 2 and mode.oneIsJumping == False):
+        if(event.key == "Up" and mode.playerOneJumpCount < 2 and mode.oneIsJumping == False and not mode.oneIsDead):
             mode.playerOneCy -= 75
             mode.playerOneJumpCount += 1
             mode.oneIsJumping = True
-        elif(event.key == 'w' and mode.playerNum == 2 and mode.playerTwoJumpCount < 2 and mode.twoIsJumping == False):
+        elif(event.key == 'w' and mode.playerNum == 2 and mode.playerTwoJumpCount < 2 and mode.twoIsJumping == False and not mode.twoIsDead):
             mode.playerTwoCy -= 75
             mode.playerTwoJumpCount += 1
             mode.twoIsJumping = True
-        elif(event.key == "Right"):
+        elif(event.key == "Right" and not mode.oneIsDead):
             #mode.playerOneCx += 10
             mode.oneIsFacingRight = True
             mode.rightKeyIsPressed = True
             mode.currPlayerModelOne = mode.stationaryAnimationRight[1]
-        elif(event.key == 'Left'):
+        elif(event.key == 'Left' and not mode.oneIsDead):
             #mode.playerOneCx -= 10
             mode.oneIsFacingRight = False
             mode.leftKeyIsPressed = True
@@ -257,12 +266,12 @@ class TutorialMode(Mode):
         elif(event.key == "p"):
             mode.isPaused = True
             mode.app.setActiveMode(mode.app.pauseMode)
-        elif(event.key == 'd' and mode.playerNum == 2):
+        elif(event.key == 'd' and mode.playerNum == 2 and not mode.twoIsDead):
             #mode.playerTwoCx += 10
             mode.twoIsFacingRight = True
             mode.dKeyIsPressed = True
             mode.currPlayerModelTwo = mode.stationaryAnimationRight[1]
-        elif(event.key == 'a' and mode.playerNum == 2):
+        elif(event.key == 'a' and mode.playerNum == 2 and not mode.twoIsDead):
             #mode.playerTwoCx -= 10
             mode.twoIsFacingRight = False
             mode.aKeyIsPressed = True
@@ -270,7 +279,7 @@ class TutorialMode(Mode):
             mode.currPlayerModelTwo = mode.stationaryAnimationLeft[1]
         
         #Shooting mechanism
-        if(event.key == 'Space' and mode.oneCanShoot):
+        if(event.key == 'Space' and mode.oneCanShoot and not mode.oneIsDead):
             mode.spaceClicks += 1
             if(mode.spaceClicks % 2 == 0):
                 if(mode.oneIsFacingRight):
@@ -279,7 +288,7 @@ class TutorialMode(Mode):
                     Bullet(mode.playerOneCx, mode.playerOneCy-25, mode.playerOneColor, -12)
                 mode.oneCanShoot = False
         
-        elif(event.key == 'Tab' and mode.playerNum == 2 and mode.twoCanShoot):
+        elif(event.key == 'Tab' and mode.playerNum == 2 and mode.twoCanShoot and not mode.twoIsDead):
             mode.tabClicks += 1
             if(mode.tabClicks % 2 == 0):
                 if(mode.twoIsFacingRight):
@@ -322,6 +331,8 @@ class TutorialMode(Mode):
         pass
     
     def timerFired(mode):
+        if(mode.enemiesKilled == 15):
+            mode.gameWon = True
         if(mode.isPaused):
             mode.isPaused = False
             return
@@ -338,7 +349,7 @@ class TutorialMode(Mode):
             bullet[0] += bullet[3]
             bullet[1] += Bullet.cyChangeRate
         
-        #This determines enemies motion
+        #This determines enemies motion (Simple AI)
         for enemy in Enemy.enemies:
             if(enemy[4] <= 0):
                 mode.enemiesNum -= 1
@@ -414,16 +425,43 @@ class TutorialMode(Mode):
             mode.currPlayerTwoModel = mode.walkingLeftAnimation[mode.walkCountTwo%7]
         
         if(mode.gameWon):
+            mode.playerOneHp = 100
+            mode.oneIsDead = False
+            mode.playerOneLives = 3
+            mode.playerOneCx = 45
+            if(mode.playerNum == 2):
+                mode.playerTwoLives = 3
+                mode.playerTwoCx = 20
+                mode.twoIsDead = False
+                mode.playerTwoHp = 100
+            Enemy.enemies = []
+            mode.enemiesNum = 0
+            mode.onStreak = False
+            mode.streak = 0
             mode.gameWon = False
             mode.dictOfTeam = {Team.teamNames: mode.score}
+            Score.score = mode.score
             mode.score = 0
             mode.cx = mode.width//2
             mode.cy = mode.height//2
             mode.app.setActiveMode(mode.app.winningMode)
             return
         if(mode.isGameOver):
+            mode.playerOneHp = 100
+            mode.oneIsDead = False
+            mode.playerOneLives = 3
+            mode.playerOneCx = 45
+            if(mode.playerNum == 2):
+                mode.playerTwoLives = 3
+                mode.playerTwoCx = 20
+                mode.twoIsDead = False
+                mode.playerTwoHp = 100
+            Enemy.enemies = []
+            mode.enemiesNum = 0
+            mode.onStreak = False
+            mode.streak = 0
             mode.isGameOver = False
-            mode.dictOfTeam = {Team.teamNames: mode.score}
+            Score.score = mode.score
             mode.score = 0
             mode.cx = mode.width//2
             mode.cy = mode.height//2
@@ -432,6 +470,19 @@ class TutorialMode(Mode):
         if(mode.playerNum > 1):
             mode.playerTwoCy += mode.playerTwoDy
             mode.checkPlayerTwoBounds()
+
+        if(mode.playerOneLives == 0):
+            mode.oneIsDead = True
+            if(mode.playerNum == 2 and mode.twoIsDead):
+                mode.isGameOver = True
+            elif(mode.playerNum == 1):
+                mode.isGameOver = True
+        
+        if(mode.playerNum == 2 and mode.playerTwoLives == 0):
+            mode.twoIsDead = True
+            if(mode.oneIsDead):
+                mode.isGameOver = True
+
         mode.playerOneCy += mode.playerOneDy
         mode.checkPlayerOneBounds()
         mode.checkBulletBounds()
@@ -491,7 +542,7 @@ class TutorialMode(Mode):
         for enemy in Enemy.enemies:
             if(abs(enemy[0] - mode.playerOneCx) < 40 and enemy[1] + 10 < mode.playerOneCy):
                 mode.playerOneHp -= 2
-                if(mode.playerOneHp < 0):
+                if(mode.playerOneHp <= 0):
                     mode.playerOneLives -= 1
                     mode.playerOneHp = 100
                 mode.onStreak = False
@@ -534,17 +585,17 @@ class TutorialMode(Mode):
                  canvas.create_image(bird.cx, bird.cy, image = ImageTk.PhotoImage(mode.birdFlying[0]))
     
     def drawPlayers(mode, canvas):
-        if (mode.playerNum == 1):
+        if (mode.playerNum == 1 and not mode.oneIsDead):
             canvas.create_image(mode.playerOneCx, mode.playerOneCy, image = ImageTk.PhotoImage(mode.currPlayerOneModel))
-        else:
+        elif (mode.playerNum == 2 and not mode.twoIsDead):
             canvas.create_image(mode.playerOneCx, mode.playerOneCy, image = ImageTk.PhotoImage(mode.currPlayerOneModel))
             canvas.create_image(mode.playerTwoCx, mode.playerTwoCy, image = ImageTk.PhotoImage(mode.currPlayerTwoModel))
     
     def drawPlayerIdentifiers(mode, canvas):
-        if(mode.playerNum == 1):
+        if(mode.playerNum == 1 and not mode.oneIsDead):
             canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
                 mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
-        else:
+        elif(mode.playerNum == 2 and not mode.twoIsDead):
             canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
                 mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
             canvas.create_oval(mode.playerTwoCx - 5, mode.playerTwoCy - 60, mode.playerTwoCx + 5,\
@@ -696,6 +747,7 @@ class PlayerDesignModeOne(Mode):
         if(clickX > mode.cx - 75 and clickX < mode.cx + 75):
             if(clickY > mode.height - 100 and clickY < mode.height - 50):
                 player1 = Player(50, mode.height - 50, mode.color1)
+                mode.color1 = None
                 mode.app.setActiveMode(mode.app.tutorialMode)
         if(clickX > 35 and clickX < 115):
             if(clickY > mode.height-50 and clickY < mode.height-25):
@@ -862,7 +914,38 @@ class WallOfFameMode(Mode):
 
 class HighScoresMode(Mode):
     def appStarted(mode):
+        url = 'https://api.myjson.com/bins/zrkyi'
+        source = requests.get(url)
+        data = json.loads(source.text)
+        data.update({Team.teamNames : Score.score})
+        headers = {'Content-Type':'application/json'}
+        requests.put(url, data = json.dumps(data), headers = headers)
+
         mode.cx, mode.cy = mode.width//2, mode.height//2
+        mode.topScore = 0
+        mode.topPlayer = ''
+
+        mode.secondScore = 3
+        mode.secondPlayer = ''
+
+        mode.thirdScore = 1
+        mode.thirdPlayer = ''
+
+        items = data.items()
+        for item in items:
+            if item[1] > mode.topScore:
+                mode.secondPlayer = mode.topPlayer
+                mode.secondScore = mode.topScore
+                mode.topPlayer = item[0]
+                mode.topScore = item[1]
+            if item[1] < mode.topScore and item[1] > mode.secondScore:
+                mode.thirdPlayer = mode.secondPlayer
+                mode.thirdScore = mode.secondScore
+                mode.secondPlayer = item[0]
+                mode.secondScore = item[1]
+            if item[1] < mode.secondScore and item[1] > mode.thirdScore:
+                mode.thirdPlayer = item[0]
+                mode.thirdScore = item[1]
     
     def mousePressed(mode, event):
         clickX, clickY = event.x, event.y
@@ -876,10 +959,20 @@ class HighScoresMode(Mode):
             font = 'Helvetica 30 bold')
         canvas.create_text(mode.cx - mode.cx//2, 150, text = '1.', fill = "white",\
             font = 'Helvetica 25 bold')
+        canvas.create_text(mode.cx, 150, text = mode.topPlayer, fill = 'white', font = 'System 30')
+        canvas.create_text(mode.cx + mode.cx//2, 150, text = mode.topScore, fill = 'white', font = 'System 30')
+
+
         canvas.create_text(mode.cx - mode.cx//2, 225, text = '2.', fill = "white",\
             font = 'Helvetica 25 bold')
+        canvas.create_text(mode.cx, 225, text = mode.secondPlayer, fill = 'white', font = 'System 30')
+        canvas.create_text(mode.cx + mode.cx//2, 225, text = mode.secondScore, fill = 'white', font = 'System 30')
+
         canvas.create_text(mode.cx - mode.cx//2, 300, text = '3.', fill = "white",\
             font = 'Helvetica 25 bold')
+        canvas.create_text(mode.cx, 300, text = mode.thirdPlayer, fill = 'white', font = 'System 30')
+        canvas.create_text(mode.cx + mode.cx//2, 300, text = mode.thirdScore, fill = 'white', font = 'Helvetica 30')
+
         canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
             outline = 'white')
         canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
@@ -891,17 +984,18 @@ class GameOverMode(Mode):
     
     def mousePressed(mode, event):
         clickX, clickY = event.x, event.y
-        if(clickX > 50 and clickX < 100):
-            if(clickY > mode.height-50 and clickY < mode.height-25):
-                mode.app.setActiveMode(mode.app.titleScreenMode)
+        if(clickX > mode.cx-25 and clickX < mode.cx+25):
+            if(clickY > mode.cy-15 and clickY < mode.cy+15):
+                mode.app.setActiveMode(mode.app.highScores)
 
     def redrawAll(mode, canvas):
-        canvas.create_text(mode.cx - mode.cx//2, mode.cy - mode.cy//2, text = "Game Over",\
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey24')
+        canvas.create_text(mode.cx, mode.cy - mode.cy//2, text = "Game Over",\
             font = 'Helvetica 30 bold', fill ='red')
-        canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
+        canvas.create_rectangle(mode.cx - 25, mode.cy - 15, mode.cx + 25, mode.cy + 15, fill = 'red',\
             outline = 'white')
-        canvas.create_text(75, mode.height - 37.5, text = 'Main Menu', fill = 'black',\
-            font = 'Helvetica 10 bold')
+        canvas.create_text(mode.cx, mode.cy, text = 'View Scores', fill = 'black',\
+            font = 'System 10 bold')
 '''
 class CutScreen(Mode):
     def appStarted(mode):
@@ -999,5 +1093,7 @@ class MyModalApp(ModalApp):
         app.timerDelay = 30
 
 LoginInfo()
-app = MyModalApp(width=700, height=500)
+
+if(LoginInfo.proceed):
+    app = MyModalApp(width=700, height=500)
 

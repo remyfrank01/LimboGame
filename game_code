@@ -3,6 +3,7 @@ from tkinter import *
 import random
 import json
 import requests
+import pygame
 
 #This program makes use of code from the 15-112 webiste to be able to run the animations.
 #Source: https://www.cs.cmu.edu/~112/notes/notes-animations-part1.html
@@ -45,7 +46,7 @@ class LoginInfo(object):
         LoginInfo.teamName = self.nameEntry.get()
         for i in range(len(LoginInfo.teamName)):
             listOfChars += LoginInfo.teamName[i]
-        if(len(listOfChars) == 1):
+        if(len(listOfChars) <= 1 or len(listOfChars) >= 9):
             self.noName = Label(self.canvas, text = 'Not a valid name', font = 'System', fg = 'red')
             self.noName.pack(side = BOTTOM)
         elif(type(LoginInfo.teamName) == str):
@@ -96,11 +97,13 @@ class Enemy(object):
 
 
 class Wall(object):
+    wallList = []
     def __init__(self, cx, cy, width, height):
         self.cx = cx
         self.cy = cy
         self.width = width
         self.height = height
+        Wall.wallList += [(cx, cy, self.width, self.height)]
 
 class Bullet(object):
     bullets = []
@@ -179,7 +182,7 @@ class TutorialMode(Mode):
             mode.playerTwoJumpCount = 0
             mode.twoIsJumping = False
 
-        mode.gameWon = False
+        mode.tutorialComplete = False
         mode.isGameOver = False
         mode.isPaused = False
         mode.scrollY = 0
@@ -215,6 +218,10 @@ class TutorialMode(Mode):
                 mode.scaleImage(mode.loadImage('walkLeft6.png'), .3),
                 mode.scaleImage(mode.loadImage('walkLeft7.png'), .3),
                 mode.scaleImage(mode.loadImage('walkLeft8.png'), .3)]
+        
+        #Dead Animation
+        mode.deceasedPlayer = mode.scaleImage(mode.loadImage('deceasedPlayer.png'), .3)
+        mode.halo = mode.scaleImage(mode.loadImage('halo.png'), .1)
         
         #Enemy stationary animation
         mode.enemyStationaryAnimationRight = mode.scaleImage(mode.loadImage('enemyStationaryRight.png'), .4)
@@ -347,8 +354,8 @@ class TutorialMode(Mode):
         pass
     
     def timerFired(mode):
-        if(mode.enemiesKilled == 15):
-            mode.gameWon = True
+        if(mode.enemiesKilled == 1):
+            mode.tutorialComplete = True
         if(mode.isPaused):
             mode.isPaused = False
             return
@@ -392,6 +399,12 @@ class TutorialMode(Mode):
             target = min(abs(distFromOne), abs(distFromTwo))
             if(mode.playerNum == 1):
                 target = abs(distFromOne)
+            
+            if(mode.playerNum == 2):
+                if(mode.oneIsDead):
+                    target = abs(distFromTwo)
+                elif(mode.twoIsDead):
+                    target = abs(distFromOne)
 
             if(target == abs(distFromOne) and distFromOne < 0):
                 enemy[3] = True
@@ -447,38 +460,43 @@ class TutorialMode(Mode):
                 mode.walkCountTwo = 1
             mode.currPlayerTwoModel = mode.walkingLeftAnimation[mode.walkCountTwo%7]
         
-        if(mode.gameWon):
+        if(mode.tutorialComplete):
+            TitleScreenMode.tutorialComplete = True
+            mode.enemiesKilled = 0
             mode.playerOneHp = 100
             mode.oneIsDead = False
             mode.playerOneLives = 3
             mode.playerOneCx = 45
+            mode.playerOneCy = mode.height - 100
             if(mode.playerNum == 2):
                 mode.playerTwoLives = 3
                 mode.playerTwoCx = 20
+                mode.playerTwoCy = mode.height - 100
                 mode.twoIsDead = False
                 mode.playerTwoHp = 100
             Enemy.enemies = []
             mode.enemiesNum = 0
             mode.onStreak = False
             mode.streak = 0
-            mode.gameWon = False
-            mode.dictOfTeam = {Team.teamNames: mode.score}
+            mode.tutorialComplete = False
             Score.score = mode.score
             mode.score = 0
             mode.cx = mode.width//2
             mode.cy = mode.height//2
-            mode.app.setActiveMode(mode.app.winningMode)
+            mode.app.setActiveMode(mode.app.levelSelect)
             return
         if(mode.isGameOver):
             mode.playerOneHp = 100
             mode.oneIsDead = False
             mode.playerOneLives = 3
             mode.playerOneCx = 45
+            mode.playerOneCy = 50
             if(mode.playerNum == 2):
                 mode.playerTwoLives = 3
                 mode.playerTwoCx = 20
                 mode.twoIsDead = False
                 mode.playerTwoHp = 100
+                mode.playerTwoCy = 50
             Enemy.enemies = []
             mode.enemiesNum = 0
             mode.onStreak = False
@@ -496,6 +514,8 @@ class TutorialMode(Mode):
 
         if(mode.playerOneLives == 0):
             mode.oneIsDead = True
+            mode.currPlayerOneModel = mode.deceasedPlayer
+            mode.playerOneCy -= 20
             if(mode.playerNum == 2 and mode.twoIsDead):
                 mode.isGameOver = True
             elif(mode.playerNum == 1):
@@ -503,6 +523,8 @@ class TutorialMode(Mode):
         
         if(mode.playerNum == 2 and mode.playerTwoLives == 0):
             mode.twoIsDead = True
+            mode.currPlayerTwoModel = mode.deceasedPlayer
+            mode.playerTwoCy -= 20
             if(mode.oneIsDead):
                 mode.isGameOver = True
 
@@ -610,7 +632,8 @@ class TutorialMode(Mode):
         instructions = '''\t  Press [Right / d] to go right\n
                     Press [Left / a] to go left\n
                     Press [Up / w] to jump\n
-                    Press [Space / Tab] to shoot enemy players'''
+                    Press [Space / Tab] to shoot enemy players\n
+                    Press [e] to spawn an enemy'''
         canvas.create_image(mode.width//2, mode.height//2 + 32, image = ImageTk.PhotoImage(mode.backgroundImage))
         canvas.create_text(mode.width//2, mode.height//2 - mode.height//4, text = 'Tutorial Mode',\
             font = 'System 30 bold', fill = 'white')
@@ -631,9 +654,9 @@ class TutorialMode(Mode):
                  canvas.create_image(bird.cx, bird.cy, image = ImageTk.PhotoImage(mode.birdFlying[0]))
     
     def drawPlayers(mode, canvas):
-        if (mode.playerNum == 1 and not mode.oneIsDead):
+        if (mode.playerNum == 1):
             canvas.create_image(mode.playerOneCx, mode.playerOneCy, image = ImageTk.PhotoImage(mode.currPlayerOneModel))
-        elif (mode.playerNum == 2 and not mode.twoIsDead):
+        elif (mode.playerNum == 2):
             canvas.create_image(mode.playerOneCx, mode.playerOneCy, image = ImageTk.PhotoImage(mode.currPlayerOneModel))
             canvas.create_image(mode.playerTwoCx, mode.playerTwoCy, image = ImageTk.PhotoImage(mode.currPlayerTwoModel))
     
@@ -641,11 +664,18 @@ class TutorialMode(Mode):
         if(mode.playerNum == 1 and not mode.oneIsDead):
             canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
                 mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
-        elif(mode.playerNum == 2 and not mode.twoIsDead):
-            canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
-                mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
-            canvas.create_oval(mode.playerTwoCx - 5, mode.playerTwoCy - 60, mode.playerTwoCx + 5,\
+        elif(mode.playerNum == 2):
+            if(mode.oneIsDead):
+                canvas.create_oval(mode.playerTwoCx - 5, mode.playerTwoCy - 60, mode.playerTwoCx + 5,\
                 mode.playerTwoCy - 50, fill = mode.playerTwoColor, outline = 'white', width = 2)
+            elif(mode.twoIsDead):
+                canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
+                    mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
+            else:
+                canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
+                    mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
+                canvas.create_oval(mode.playerTwoCx - 5, mode.playerTwoCy - 60, mode.playerTwoCx + 5,\
+                    mode.playerTwoCy - 50, fill = mode.playerTwoColor, outline = 'white', width = 2)
     
     def drawEnemies(mode, canvas):
         #mode.enemyWalkingRightAnimation
@@ -667,12 +697,21 @@ class TutorialMode(Mode):
         canvas.create_text(mode.width//2, 35, text = f'Score: {mode.score}', fill = 'white', font = 'System 20')
     
     def drawHp(mode, canvas):
-        canvas.create_rectangle(20, 10, 120, 30, fill = None, outline = 'white')
-        canvas.create_rectangle(20, 12, 20 + mode.playerOneHp, 28, fill = mode.playerOneColor)
+        if(mode.oneIsDead == False):
+            canvas.create_rectangle(20, 10, 120, 30, fill = None, outline = 'white')
+            canvas.create_rectangle(20, 12, 20 + mode.playerOneHp, 28, fill = mode.playerOneColor)
+        canvas.create_text(70, 50, text = f'Lives: {mode.playerOneLives}', font = 'System 10', fill = 'white')
 
-        if(mode.playerNum == 2):
+        if(mode.playerNum == 2 and mode.twoIsDead == False):
             canvas.create_rectangle(mode.width - 120, 10, mode.width - 20, 30, fill = None, outline = 'white')
             canvas.create_rectangle(mode.width - (mode.playerTwoHp + 20) , 12, mode.width - 20, 28, fill = mode.playerTwoColor)
+            canvas.create_text(mode.width - 70, 50, text = f'Lives: {mode.playerTwoLives}', font = 'System 10', fill = 'white')
+    
+    def drawDeath(mode, canvas):
+        if(mode.oneIsDead):
+            canvas.create_image(mode.playerOneCx - 50, mode.playerOneCy + 3, image = ImageTk.PhotoImage(mode.halo))
+        elif(mode.playerNum == 2 and mode.twoIsDead):
+            canvas.create_image(mode.playerTwoCx - 50, mode.playerTwoCy + 3, image = ImageTk.PhotoImage(mode.halo))
 
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
@@ -685,9 +724,720 @@ class TutorialMode(Mode):
         mode.drawPlayerIdentifiers(canvas)
         mode.drawEnemies(canvas)
         mode.drawProjectiles(canvas)
+        if(mode.oneIsDead or (mode.playerNum == 2 and mode.twoIsDead)):
+            mode.drawDeath(canvas)
+
+class GameMode(Mode):
+    isPaused = False
+    def appStarted(mode):
+        mode.playerNum = len(Player.players)
+        mode.enemiesNum = len(Enemy.enemies)
+        mode.scrollX = 0
+
+        mode.playersRemaining = 1
+        if(mode.playerNum == 2):
+            mode.playersRemaining = 2
+
+        mode.oneIsFacingRight = True
+        mode.twoIsFacingRight = True
+
+        mode.oneIsDead = False
+        if(mode.playerNum == 2):
+            mode.twoIsDead = False
+
+        #Enemies
+        mode.enemies = []
+        mode.streak = 0
+        mode.onStreak = False
+        mode.enemiesKilled = 0
+        mode.score = 0
+
+        #Player 1
+        mode.playerOneCx = Player.players[0][0]
+        mode.playerOneCy = Player.players[0][1]
+        mode.playerOneHp = Player.hp
+        mode.playerOneVel = Player.speed
+        mode.playerOneLives = Player.lives
+        mode.playerOneDy = Player.cyChangeRate
+        mode.playerOneJumpCount = 0
+        mode.oneIsJumping = False
+
+        #Player 2
+        if(mode.playerNum > 1):
+            mode.playerTwoCx = Player.players[1][0]
+            mode.playerTwoCy = Player.players[1][1]
+            mode.playerTwoHp = Player.hp
+            mode.playerTwoVel = Player.speed
+            mode.playerTwoLives = Player.lives
+            mode.playerTwoDy = Player.cyChangeRate
+            mode.playerTwoJumpCount = 0
+            mode.twoIsJumping = False
+
+        mode.gameWon = False
+        mode.isGameOver = False
+        mode.isPaused = False
+        mode.scrollY = 0
+        mode.scrollX = 0
+        mode.walls = []
+        mode.walkCountOne = 0
+        mode.walkCountTwo = 0
+        mode.rightKeyIsPressed = False
+        mode.dKeyIsPressed = False
+        mode.leftKeyIsPressed = False
+        mode.aKeyIsPressed = False
+
+        #Standing Animations(left and right)
+        mode.stationaryAnimationRight = [mode.scaleImage(mode.loadImage('Stationary.png'), .3),
+            mode.scaleImage(mode.loadImage('walk1.png'), .3)]
+        mode.stationaryAnimationLeft = [mode.scaleImage(mode.loadImage('StationaryLeft.png'), .3),
+            mode.scaleImage(mode.loadImage('walkLeft1.png'), .3)]
+
+        #Right facing animations
+        mode.walkingRightAnimation = [mode.scaleImage(mode.loadImage('walk2.png'), .3),
+                mode.scaleImage(mode.loadImage('walk3.png'), .3),
+                mode.scaleImage(mode.loadImage('walk4.png'), .3),
+                mode.scaleImage(mode.loadImage('walk5.png'), .3),
+                mode.scaleImage(mode.loadImage('walk6.png'), .3),
+                mode.scaleImage(mode.loadImage('walk7.png'), .3),
+                mode.scaleImage(mode.loadImage('walk8.png'), .3)]
+        
+        #Left facing animations
+        mode.walkingLeftAnimation = [mode.scaleImage(mode.loadImage('walkLeft2.png'), .3),
+                mode.scaleImage(mode.loadImage('walkLeft3.png'), .3),
+                mode.scaleImage(mode.loadImage('walkLeft4.png'), .3),
+                mode.scaleImage(mode.loadImage('walkLeft5.png'), .3),
+                mode.scaleImage(mode.loadImage('walkLeft6.png'), .3),
+                mode.scaleImage(mode.loadImage('walkLeft7.png'), .3),
+                mode.scaleImage(mode.loadImage('walkLeft8.png'), .3)]
+
+        #Death animation
+        mode.deceasedPlayer = mode.scaleImage(mode.loadImage('deceasedPlayer.png'), .3)
+        mode.halo = mode.scaleImage(mode.loadImage('halo.png'), .1)
+        
+        #Enemy stationary animation
+        mode.enemyStationaryAnimationRight = mode.scaleImage(mode.loadImage('enemyStationaryRight.png'), .4)
+        mode.enemyStationaryAnimationLeft = mode.scaleImage(mode.loadImage('enemyStationaryLeft.png'), .4)
+        
+        #Enemy right moving animations
+        mode.enemyWalkingRightAnimation = [mode.scaleImage(mode.loadImage('enemyRight1.png'), .4),
+                mode.scaleImage(mode.loadImage('enemyRight2.png'), .4),
+                mode.scaleImage(mode.loadImage('enemyRight3.png'), .4),
+                mode.scaleImage(mode.loadImage('enemyRight4.png'), .4)]
+        
+        #Enemy left moving animations
+        mode.enemyWalkingLeftAnimation = [mode.scaleImage(mode.loadImage('enemyLeft1.png'), .4),
+                mode.scaleImage(mode.loadImage('enemyLeft2.png'), .4),
+                mode.scaleImage(mode.loadImage('enemyLeft3.png'), .4),
+                mode.scaleImage(mode.loadImage('enemyLeft4.png'), .4)]
+        
+        mode.currEnemyModel = mode.enemyStationaryAnimationRight
+        
+        mode.backgroundImage = mode.scaleImage(mode.loadImage('cityScape.png'), 2)
+        
+        mode.currPlayerOneModel = mode.stationaryAnimationRight[0]
+        mode.createBird = False
+        mode.birdFlying = [mode.scaleImage(mode.loadImage('BirdUp.png'), .3), 
+            mode.scaleImage(mode.loadImage('BirdNull.png'), .3),
+            mode.scaleImage(mode.loadImage('BirdDown.png'), .3)]
+        mode.birds = []
+        mode.birdPosition = 0
+
+        mode.bulletRadius = 2
+        mode.oneCanShoot = True
+        mode.twoCanShoot = False
+        mode.spaceClicks = 0
+        mode.tabClicks = 0
+
+        if(mode.playerNum == 1):
+            mode.playerOneColor = Player.players[0][2]
+        else:
+            mode.playerOneColor = Player.players[0][2]
+            mode.playerTwoColor = Player.players[1][2]
+            mode.currPlayerTwoModel = mode.stationaryAnimationRight[0]
+
+        mode.backImg = mode.loadImage('TreeLine.png')
+
+        for i in range(10, 45):
+            spawnEnemy = random.randrange(10)
+            if(spawnEnemy >= 7):
+                mode.enemiesNum += 1
+                enemyCx = 100*i
+                Enemy(enemyCx, mode.height - 70)
+
+        mode.leftBarrier = Wall(-100, mode.height//2, 100, mode.height//2)
+        mode.rightBarrier = Wall(5100, mode.height//2, 100, mode.height//2)
+
+        mode.endImageOne = mode.scaleImage(mode.loadImage('FriendOne.png'), .4)
+        mode.endImage = mode.scaleImage(mode.loadImage('FriendTwo.png'), .4)
+        mode.endPoint = mode.endImageOne
+        mode.tree = mode.scaleImage(mode.loadImage('tree1.png'), .7)
+        mode.bench = mode.scaleImage(mode.loadImage('bench.png'), .3)
+        mode.well = mode.scaleImage(mode.loadimage('well.png'), .3)
+
+    
+    def keyPressed(mode, event):
+        if(event.key == "Up" and mode.playerOneJumpCount < 2 and mode.oneIsJumping == False and not mode.oneIsDead):
+            mode.getDistanceFromEnemyOne()
+            mode.playerOneCy -= 75
+            mode.playerOneJumpCount += 1
+            mode.oneIsJumping = True
+        elif(event.key == 'w' and mode.playerNum == 2 and mode.playerTwoJumpCount < 2 and mode.twoIsJumping == False and not mode.twoIsDead):
+            mode.getDistanceFromEnemyTwo()
+            mode.playerTwoCy -= 75
+            mode.playerTwoJumpCount += 1
+            mode.twoIsJumping = True
+        elif(event.key == "Right" and not mode.oneIsDead):
+            #mode.playerOneCx += 10
+            mode.scrollX += 5
+            mode.oneIsFacingRight = True
+            mode.rightKeyIsPressed = True
+            mode.currPlayerModelOne = mode.stationaryAnimationRight[1]
+        elif(event.key == 'Left' and not mode.oneIsDead):
+            #mode.playerOneCx -= 10
+            mode.scrollX -= 5
+            mode.oneIsFacingRight = False
+            mode.leftKeyIsPressed = True
+            mode.rightKeyIsPressed = False
+            mode.currPlayerModelOne = mode.stationaryAnimationLeft[1]
+        elif(event.key == "p"):
+            GameMode.isPaused = True
+            mode.app.setActiveMode(mode.app.pauseMode)
+        elif(event.key == 'd' and mode.playerNum == 2 and not mode.twoIsDead):
+            #mode.playerTwoCx += 10
+            mode.twoIsFacingRight = True
+            mode.dKeyIsPressed = True
+            mode.currPlayerModelTwo = mode.stationaryAnimationRight[1]
+        elif(event.key == 'a' and mode.playerNum == 2 and not mode.twoIsDead):
+            #mode.playerTwoCx -= 10
+            mode.twoIsFacingRight = False
+            mode.aKeyIsPressed = True
+            mode.dKeyIsPressed = False
+            mode.currPlayerModelTwo = mode.stationaryAnimationLeft[1]
+        
+        #Shooting mechanism
+        if(event.key == 'Space' and mode.oneCanShoot and not mode.oneIsDead):
+            mode.spaceClicks += 1
+            if(mode.spaceClicks % 2 == 0):
+                if(mode.oneIsFacingRight):
+                    Bullet(mode.playerOneCx, mode.playerOneCy-25, mode.playerOneColor, 12)
+                else:
+                    Bullet(mode.playerOneCx, mode.playerOneCy-25, mode.playerOneColor, -12)
+                mode.oneCanShoot = False
+        
+        elif(event.key == 'Tab' and mode.playerNum == 2 and mode.twoCanShoot and not mode.twoIsDead):
+            mode.tabClicks += 1
+            if(mode.tabClicks % 2 == 0):
+                if(mode.twoIsFacingRight):
+                    Bullet(mode.playerTwoCx, mode.playerTwoCy-25, mode.playerTwoColor, 12)
+                else:
+                    Bullet(mode.playerTwoCx, mode.playerTwoCy-25, mode.playerTwoColor, -12)
+                mode.twoCanShoot = False
+
+    def keyReleased(mode, event):
+        if(event.key == "Right"):
+            mode.rightKeyIsPressed = False
+            mode.currPlayerOneModel = mode.stationaryAnimationRight[0]
+        elif(event.key == "Left"):
+            mode.leftKeyIsPressed = False
+            mode.currPlayerOneModel = mode.stationaryAnimationLeft[0]
+        elif(event.key == 'Up'):
+            mode.oneIsJumping = False
+
+        if(event.key == 'd'):
+            mode.dKeyIsPressed = False
+            mode.currPlayerTwoModel = mode.stationaryAnimationRight[0]
+        elif(event.key == 'a'):
+            mode.aKeyIsPressed = False
+            mode.currPlayerTwoModel = mode.stationaryAnimationLeft[0]
+        elif(event.key == 'w'):
+            mode.twoIsJumping = False
+        
+        if(event.key == 'Space'):
+            mode.oneCanShoot = True
+        if(event.key == 'Tab'):
+            mode.twoCanShoot = True
+
+    def timerFired(mode):
+        if(mode.isPaused):
+            mode.isPaused = False
+            return
+        mode.createBird = False
+        newBird = random.randrange(100)
+        for bird in mode.birds:
+            bird.cx -= bird.changeX
+            if(bird.cx <= -25):
+                mode.birds.remove(bird)
+        if(newBird >= 98):
+            mode.createBird = True
+        
+        for bullet in Bullet.bullets:
+            bullet[0] += bullet[3]
+            bullet[1] += Bullet.cyChangeRate
+        
+        #This determines enemies motion (Simple AI)
+        for enemy in Enemy.enemies:
+            if(enemy[4] <= 0):
+                mode.enemiesNum -= 1
+                mode.streak += 1
+                mode.onStreak = True
+                Enemy.enemies.remove(enemy)
+                mode.score += (10 * mode.streak)
+                mode.enemiesKilled += 1
+            enemy[1] += Enemy.cyChangeRate
+            enemyJumps = random.randrange(100)
+            distFromOne = enemy[0] - mode.playerOneCx
+
+            if(abs(distFromOne) < dataCollection.average+5 and abs(distFromOne) > dataCollection.average-5 and enemy[5] < 2):
+                enemy[5] += 1
+                enemy[1] -= 100
+
+            distFromTwo = 0
+            if(mode.playerNum > 1):
+                distFromTwo = enemy[0] - mode.playerTwoCx
+            if(abs(distFromTwo) < dataCollection.average+5 and abs(distFromTwo) > dataCollection.average-5 and enemy[5] < 2):
+                enemy[5] += 1
+                enemy[1] -= 100
+
+            target = min(abs(distFromOne), abs(distFromTwo))
+            if(mode.playerNum == 1):
+                target = abs(distFromOne)
+
+            if(target == abs(distFromOne) and distFromOne < 0 and enemy[0] <= mode.width):
+                enemy[3] = True
+                enemy[0] += Enemy.speed
+                enemy[2] += 1
+            elif(target == abs(distFromOne) and distFromOne > 0 and enemy[0] <= mode.width):
+                enemy[3] = False
+                enemy[0] -= Enemy.speed
+                enemy[2] += 1
+            elif(target == abs(distFromOne) and distFromOne == 0):
+                enemy[3] = True
+                mode.currEnemyModel = mode.enemyStationaryAnimationRight
+            
+            if(mode.playerNum > 1):
+                if(target == abs(distFromTwo) and distFromTwo < 0 and enemy[0] <= mode.width):
+                    enemy[3] = True
+                    enemy[0] += Enemy.speed
+                    enemy[2] += 1
+                elif(target == abs(distFromTwo) and distFromTwo > 0 and enemy[0] <= mode.width):
+                    enemy[3] = False
+                    enemy[0] -= Enemy.speed
+                    enemy[2] += 1
+                elif(target == abs(distFromOne) and distFromOne == 0):
+                    enemy[3] = False
+                    mode.currEnemyModel = mode.enemyStationaryAnimationLeft
+            
+            if(mode.rightKeyIsPressed or (mode.playerNum == 2 and mode.dKeyIsPressed)):
+                for enemy in Enemy.enemies:
+                    if(enemy[0] <= Wall.wallList[0][0] + Wall.wallList[0][2] - mode.scrollX + 10):
+                        pass
+                    else:
+                        enemy[0] -= 1
+            elif(mode.leftKeyIsPressed or (mode.playerNum == 2 and mode.aKeyIsPressed)):
+                for enemy in Enemy.enemies:
+                    if(enemy[0] >= Wall.wallList[1][0] - Wall.wallList[1][2] - mode.scrollX - 10):
+                        pass
+                    else:
+                        enemy[0] += 1
+
+
+        #Walking Right
+        if(mode.rightKeyIsPressed):
+            if(mode.playerNum == 1):
+                if(mode.playerOneCx >= mode.width - mode.width//4):
+                    mode.scrollX += 10
+                else:
+                    #mode.scrollX += 10
+                    mode.playerOneCx += mode.playerOneVel
+            else:
+                if(mode.playerOneCx >= mode.width - mode.width//4 and mode.playerTwoCx - 15 >= 20):
+                    mode.scrollX += 10
+                elif(mode.playerOneCx >= mode.width - mode.width//4 and mode.playerTwoCx - 15 < 20):
+                    pass
+                else:
+                    mode.playerOneCx += mode.playerOneVel
+                    if(mode.dKeyIsPressed == False):
+                        mode.playerTwoCx -= 10
+            mode.walkCountOne += 1
+            if(mode.walkCountOne >= 7):
+                mode.walkCountOne = 1
+            mode.currPlayerOneModel = mode.walkingRightAnimation[mode.walkCountOne%7]
+
+        if(mode.dKeyIsPressed and mode.playerNum == 2):
+            if(mode.playerTwoCx >= mode.width - mode.width//4 and mode.playerOneCx - 15 > 3):
+                mode.scrollX += 10
+            elif(mode.playerTwoCx >= mode.width - mode.width//4 and mode.playerOneCx - 15 < 3):
+                pass
+            else:
+                mode.playerTwoCx += mode.playerTwoVel
+                if(mode.rightKeyIsPressed == False):
+                    mode.playerOneCx -= 10
+            mode.walkCountTwo += 1
+            if(mode.walkCountTwo >= 7):
+                mode.walkCountTwo = 1
+            mode.currPlayerTwoModel = mode.walkingRightAnimation[mode.walkCountTwo%7]
+        
+        #Walking Left
+        if(mode.leftKeyIsPressed):
+            if(mode.playerOneCx <= mode.width//4):
+                mode.scrollX -= 10
+            else:
+                mode.scrollX -= 10
+                mode.playerOneCx -= mode.playerOneVel
+            mode.walkCountOne += 1
+            if(mode.walkCountOne >= 7):
+                mode.walkCountOne = 1
+            mode.currPlayerOneModel = mode.walkingLeftAnimation[mode.walkCountOne%7]
+        if(mode.aKeyIsPressed and mode.playerNum == 2):
+            if(mode.playerTwoCx <= mode.width//4):
+                mode.walkCountTwo +=1
+            else:
+                mode.playerTwoCx -= mode.playerTwoVel
+                mode.walkCountTwo += 1
+            if(mode.walkCountTwo >= 7):
+                mode.walkCountTwo = 1
+            mode.currPlayerTwoModel = mode.walkingLeftAnimation[mode.walkCountTwo%7]
+        
+        if(mode.enemiesNum == 0):
+            mode.endPoint = mode.endImage
+        
+        if(mode.enemiesNum == 0 and mode.playerOneCx >= 5000 - 250 - mode.scrollX - 10 and 
+            mode.playerOneCx <= 5000 - 250 - mode.scrollX + 10):
+            mode.gameWon = True
+        
+        if(mode.gameWon):
+            mode.endPoint = mode.endImageOne
+            mode.enemiesKilled = 0
+            mode.playerOneHp = 100
+            mode.oneIsDead = False
+            mode.playerOneLives = 3
+            mode.playerOneCx = 45
+            mode.playerOneCy = mode.height - 100
+            mode.scrollX = 0
+            if(mode.playerNum == 2):
+                mode.playerTwoLives = 3
+                mode.playerTwoCx = 20
+                mode.twoIsDead = False
+                mode.playerTwoHp = 100
+                mode.playerTwoCy = mode.height - 100
+            Enemy.enemies = []
+            mode.enemiesNum = 0
+            for i in range(10, 45):
+                spawnEnemy = random.randrange(10)
+                if(spawnEnemy >= 7):
+                    mode.enemiesNum += 1
+                    enemyCx = 100*i
+                    Enemy(enemyCx, mode.height - 70)
+            mode.onStreak = False
+            mode.streak = 0
+            mode.gameWon = False
+            mode.dictOfTeam = {Team.teamNames: mode.score}
+            Score.score = mode.score
+            mode.score = 0
+            mode.cx = mode.width//2
+            mode.cy = mode.height//2
+            mode.app.setActiveMode(mode.app.winningMode)
+            return
+        if(mode.isGameOver):
+            mode.endPoint = mode.endImageOne
+            mode.playerOneHp = 100
+            mode.oneIsDead = False
+            mode.playerOneLives = 3
+            mode.playerOneCx = 45
+            mode.playerOneCy = 50
+            if(mode.playerNum == 2):
+                mode.playerTwoLives = 3
+                mode.playerTwoCx = 20
+                mode.twoIsDead = False
+                mode.playerTwoHp = 100
+                mode.playerTwoCy = 50
+            Enemy.enemies = []
+            mode.enemiesNum = 0
+            for i in range(10, 45):
+                spawnEnemy = random.randrange(10)
+                if(spawnEnemy >= 7):
+                    mode.enemiesNum += 1
+                    enemyCx = 100*i
+                    Enemy(enemyCx, mode.height - 70)
+            mode.onStreak = False
+            mode.streak = 0
+            mode.isGameOver = False
+            Score.score = mode.score
+            mode.score = 0
+            mode.cx = mode.width//2
+            mode.cy = mode.height//2
+            mode.app.setActiveMode(mode.app.overMode)
+            return
+        if(mode.playerNum > 1):
+            mode.playerTwoCy += mode.playerTwoDy
+            mode.checkPlayerTwoBounds()
+
+        if(mode.playerOneLives == 0):
+            mode.oneIsDead = True
+            mode.currPlayerOneModel = mode.deceasedPlayer
+            mode.playerOneCy -= 20
+            if(mode.playerNum == 2 and mode.twoIsDead):
+                mode.isGameOver = True
+            elif(mode.playerNum == 1):
+                mode.isGameOver = True
+        
+        if(mode.playerNum == 2 and mode.playerTwoLives == 0):
+            mode.twoIsDead = True
+            mode.currPlayerTwoModel = mode.deceasedPlayer
+            mode.playerTwoCy -= 20
+            if(mode.oneIsDead):
+                mode.isGameOver = True
+
+        mode.playerOneCy += mode.playerOneDy
+        mode.checkPlayerOneBounds()
+        mode.checkBulletBounds()
+        mode.checkEnemyBounds()
+        mode.checkBulletHits()
+        mode.checkEnemyAttack()
+        mode.checkWallHits()
+
+        mode.birdPosition += 1
+
+    def checkBulletBounds(mode):
+        for bullet in Bullet.bullets:
+            if bullet[0] <= 0:
+                Bullet.bullets.remove(bullet)
+            elif bullet[0] >= mode.width:
+                Bullet.bullets.remove(bullet)
+            elif bullet[1] >= mode.height - 20:
+                Bullet.bullets.remove(bullet)
+    
+    def checkWallHits(mode):
+        for (cx, cy, width, height) in Wall.wallList:
+            if cx < mode.playerOneCx:
+                if(mode.playerOneCx - 15 <= cx + width - mode.scrollX):
+                    mode.playerOneCx = cx + width - mode.scrollX + 15
+                    mode.leftKeyIsPressed = False
+                if(mode.playerNum == 2 and mode.playerTwoCx - 15 <= cx + width - mode.scrollX):
+                    mode.playerTwoCx = cx + width - mode.scrollX + 15
+                    mode.aKeyIsPressed = False
+            if cx > mode.playerOneCx:
+                if(mode.playerOneCx + 10 >= cx - width - mode.scrollX):
+                    mode.playerOneCx = cx - width - mode.scrollX - 10
+                    mode.rightKeyIsPressed = False
+                if(mode.playerNum == 2 and mode.playerTwoCx +10 >= cx - width - mode.scrollX):
+                    mode.playerTwoCx = cx - width - mode.scrollX - 10
+                    mode.dKeyIsPressed = False
+                    
+
+    def checkPlayerOneBounds(mode):
+        if(mode.playerOneCy + 50 >= mode.height):
+            mode.playerOneCy = mode.height - 50
+            mode.playerOneJumpCount = 0
+            mode.oneIsJumping = False
+
+        if(mode.playerOneCx - 20 <= 0):
+            mode.playerOneCx = 20
+        elif(mode.playerOneCx + 20 >= mode.width):
+            mode.playerOneCx = mode.width - 20
+
+    def checkPlayerTwoBounds(mode):
+        if(mode.playerTwoCy + 50 >= mode.height):
+            mode.playerTwoCy = mode.height - 50
+            mode.playerTwoJumpCount = 0
+            mode.twoIsJumping = False
+
+        if(mode.playerTwoCx - 20 <= 0):
+            mode.playerTwoCx = 20
+        elif(mode.playerTwoCx + 20 >= mode.width):
+            mode.playerTwoCx = mode.width - 20
+
+    def checkEnemyBounds(mode):
+        for enemy in Enemy.enemies:
+            if(enemy[1] + 70 >= mode.height):
+                enemy[5] = 0
+                enemy[1] = mode.height - 70
+
+    def getDistanceFromEnemyOne(mode):
+        takeDataPoint = random.randrange(100)
+        if(takeDataPoint >= 95):
+            for enemy in Enemy.enemies:
+                if(mode.playerOneCx < enemy[0] and mode.oneIsFacingRight):
+                    dataCollection(enemy[0] - mode.playerOneCx)
+                elif(mode.playerOneCx > enemy[0] and mode.oneIsFacingRight == False):
+                    dataCollection(mode.playerOneCx - enemy[0])
+
+    def getDistanceFromEnemyTwo(mode):
+        takeDataPoint = random.randrange(100)
+        if(takeDataPoint >= 95):
+            for enemy in Enemy.enemies:
+                if(mode.playerTwoCx < enemy[0] and mode.twoIsFacingRight):
+                    dataCollection(enemy[0] - mode.playerTwoCx)
+                elif(mode.playerTwoCx > enemy [0] and mode.twoIsFacingRight == False):
+                    dataCollection(mode.playerTwoCx - enemy[0])
+
+    def checkBulletHits(mode):
+        for enemy in Enemy.enemies:
+            for bullet in Bullet.bullets:
+                if(bullet[0] > enemy[0]-20 and bullet[0] < enemy[0] + 20 \
+                    and bullet[1] < enemy[1] + 40 and bullet[1] > enemy[1] - 35):
+                    enemy[4] -= 2
+                    Bullet.bullets.remove(bullet)
+
+    def checkEnemyAttack(mode):
+        for enemy in Enemy.enemies:
+            if(abs(enemy[0] - mode.playerOneCx) < 40 and enemy[1] + 10 < mode.playerOneCy):
+                mode.playerOneHp -= 2
+                if(mode.playerOneHp <= 0):
+                    mode.playerOneLives -= 1
+                    mode.playerOneHp = 100
+                mode.onStreak = False
+                mode.streak = 0
+            
+            if(mode.playerNum > 1):
+                if(abs(enemy[0] - mode.playerTwoCx) < 40 and enemy[1] + 10 < mode.playerTwoCy):
+                    mode.playerTwoHp -= 2
+                    if(mode.playerTwoHp < 0):
+                        mode.playerTwoLives -= 1
+                        mode.playerTwoHp = 100
+                    mode.onStreak = False
+                    mode.streak = 0
+
+    def drawBackground(mode, canvas):
+        canvas.create_image(mode.width//2, mode.height - 160, image = ImageTk.PhotoImage(mode.backImg))
+
+        for i in range(50):
+            if(i%5 == 0 and i != 0):
+                treeCx = i*100
+                treeCy = mode.height - 95
+                canvas.create_image(treeCx - mode.scrollX, treeCy, image = ImageTk.PhotoImage(mode.tree))
+    
+    def drawBirds(mode, canvas):
+        if(mode.birdPosition > 2):
+            mode.birdPosition = 0
+        if(mode.createBird and len(mode.birds) < 5):
+            mode.birds += [Bird(mode.width + 10, 50, random.randrange(3, 5))]
+        for bird in  mode.birds:
+            if(mode.birdPosition == 0):
+                 canvas.create_image(bird.cx, bird.cy, image = ImageTk.PhotoImage(mode.birdFlying[0]))
+            elif(mode.birdPosition == 1):
+                 canvas.create_image(bird.cx, bird.cy, image = ImageTk.PhotoImage(mode.birdFlying[1]))
+            elif(mode.birdPosition == 2):
+                 canvas.create_image(bird.cx, bird.cy, image = ImageTk.PhotoImage(mode.birdFlying[0]))
+
+    def drawPlayers(mode, canvas):
+        if (mode.playerNum == 1):
+            canvas.create_image(mode.playerOneCx, mode.playerOneCy, image = ImageTk.PhotoImage(mode.currPlayerOneModel))
+        elif (mode.playerNum == 2):
+            canvas.create_image(mode.playerOneCx, mode.playerOneCy, image = ImageTk.PhotoImage(mode.currPlayerOneModel))
+            canvas.create_image(mode.playerTwoCx, mode.playerTwoCy, image = ImageTk.PhotoImage(mode.currPlayerTwoModel))
+
+    def drawPlayerIdentifiers(mode, canvas):
+        if(mode.playerNum == 1 and not mode.oneIsDead):
+            canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
+                mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
+        elif(mode.playerNum == 2):
+            if(mode.oneIsDead):
+                canvas.create_oval(mode.playerTwoCx - 5, mode.playerTwoCy - 60, mode.playerTwoCx + 5,\
+                mode.playerTwoCy - 50, fill = mode.playerTwoColor, outline = 'white', width = 2)
+            elif(mode.twoIsDead):
+                canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
+                    mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
+            else:
+                canvas.create_oval(mode.playerOneCx - 5, mode.playerOneCy - 60, mode.playerOneCx + 5,\
+                    mode.playerOneCy - 50, fill = mode.playerOneColor, outline = 'white', width = 2)
+                canvas.create_oval(mode.playerTwoCx - 5, mode.playerTwoCy - 60, mode.playerTwoCx + 5,\
+                    mode.playerTwoCy - 50, fill = mode.playerTwoColor, outline = 'white', width = 2)
+
+    def drawEnemies(mode, canvas):
+        for enemy in Enemy.enemies:
+            if(enemy[3]):
+                mode.currEnemyModel = mode.enemyWalkingRightAnimation[enemy[2] % 3]
+            else:
+                mode.currEnemyModel = mode.enemyWalkingLeftAnimation[enemy[2] % 3]
+            canvas.create_image(enemy[0], enemy[1], image = ImageTk.PhotoImage(mode.currEnemyModel))
+
+    def drawProjectiles(mode, canvas):
+        for bullet in Bullet.bullets:
+            canvas.create_oval(bullet[0] - mode.bulletRadius, bullet[1] - mode.bulletRadius,\
+                bullet[0] + mode.bulletRadius, bullet[1] + mode.bulletRadius, fill = bullet[2],\
+                    outline = 'black')
+
+    def drawScore(mode, canvas):
+        canvas.create_text(mode.width//2, 35, text = f'Score: {mode.score}', fill = 'white', font = 'System 20')
+
+    def drawHp(mode, canvas):
+        if(mode.oneIsDead == False):
+            canvas.create_rectangle(20, 10, 120, 30, fill = None, outline = 'white')
+            canvas.create_rectangle(20, 12, 20 + mode.playerOneHp, 28, fill = mode.playerOneColor)
+        canvas.create_text(70, 50, text = f'Lives: {mode.playerOneLives}', font = 'System 10', fill = 'white')
+
+        if(mode.playerNum == 2 and mode.twoIsDead == False):
+            canvas.create_rectangle(mode.width - 120, 10, mode.width - 20, 30, fill = None, outline = 'white')
+            canvas.create_rectangle(mode.width - (mode.playerTwoHp + 20) , 12, mode.width - 20, 28, fill = mode.playerTwoColor)
+            canvas.create_text(mode.width - 70, 50, text = f'Lives: {mode.playerTwoLives}', font = 'System 10', fill = 'white')
+    
+    def drawDeath(mode, canvas):
+        if(mode.oneIsDead):
+            canvas.create_image(mode.playerOneCx - 50, mode.playerOneCy + 3, image = ImageTk.PhotoImage(mode.halo))
+        elif(mode.playerNum == 2 and mode.twoIsDead):
+            canvas.create_image(mode.playerTwoCx - 50, mode.playerTwoCy + 3, image = ImageTk.PhotoImage(mode.halo))
+
+    def redrawAll(mode, canvas):
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
+        mode.drawBackground(canvas)
+        canvas.create_rectangle(0 - mode.scrollX, 475, 5000 - mode.scrollX, mode.height, fill = 'black')
+        for wall in Wall.wallList:
+            canvas.create_rectangle(wall[0] + wall[2] - mode.scrollX, wall[1] - wall[3],
+                wall[0] - wall[2] - mode.scrollX, wall[1] + wall[3], fill = 'black')
+        canvas.create_image(5000 - 250 - mode.scrollX, mode.height - 70, image = ImageTk.PhotoImage(mode.endPoint))
+        mode.drawScore(canvas)
+        mode.drawHp(canvas)
+        mode.drawBirds(canvas)
+        mode.drawPlayers(canvas)
+        mode.drawPlayerIdentifiers(canvas)
+        mode.drawEnemies(canvas)
+        mode.drawProjectiles(canvas)
+        if(mode.oneIsDead or (mode.playerNum == 2 and mode.twoIsDead)):
+            mode.drawDeath(canvas)
+
+class LevelSelectMode(Mode):
+    def appStarted(mode):
+        mode.rectWidth = 45
+        mode.rectHeight = 40
+        mode.cx = mode.width//2
+        mode.cy = mode.height//2
+        mode.icon = mode.scaleImage(mode.loadImage('FriendIcon.png'), .3)
+        mode.outline = 'black'
+        mode.levelSelected = False
+        mode.selectionError = False
+    
+    def mousePressed(mode, event):
+        clickX, clickY = event.x, event.y
+        if(clickX >= mode.cx - 30 and clickX <= mode.cx + 30):
+            if(clickY >= mode.height - 50 and clickY <= mode.height - 20):
+                if(mode.levelSelected):
+                    mode.app.setActiveMode(mode.app.gameMode)
+                else:
+                    mode.selectionError = True
+        
+        if(clickX >= mode.cx - mode.rectWidth and clickX <= mode.cx + mode.rectWidth):
+            if(clickY >= mode.cy - mode.rectHeight and clickY <= mode.cy + mode.rectHeight):
+                mode.levelSelected = True
+                mode.outline = 'white'
+    
+    def redrawAll(mode, canvas):
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'black')
+        canvas.create_rectangle(mode.cx - mode.rectWidth, mode.cy - mode.rectHeight, mode.cx + mode.rectWidth,
+            mode.cy + mode.rectHeight, fill = 'grey15', outline = mode.outline)
+        canvas.create_text(mode.cx, mode.cy + mode.rectHeight*(3/2), text = 'Rescue Mission', font = 'System 12', fill = 'white')
+        canvas.create_rectangle(mode.cx - 30, mode.height - 50, mode.cx + 30, mode.height - 20, fill = 'red2')
+        canvas.create_text(mode.cx, mode.height - 35, text = 'Begin', font = 'System 12', fill = 'black')
+        canvas.create_text(mode.cx, 100, text = 'Tutorial Complete', font = 'System 16', fill = 'white')
+        canvas.create_text(mode.cx, 175, text = 'Level Select:', font = 'System 14', fill = 'white')
+        canvas.create_image(mode.cx + 30, mode.cy + 15, image = ImageTk.PhotoImage(mode.icon))
+        if(mode.selectionError):
+            canvas.create_text(mode.cx, mode.cy + mode.rectHeight*(5/2), text = 'Please Select a Level First', font = 'System 12',
+                fill = 'red2')
 
 class TitleScreenMode(Mode):
     scoresViewable = False
+    tutorialComplete = False
 
     def appStarted(mode):
         mode.lockOnePlayer = False
@@ -1111,51 +1861,29 @@ class GameOverMode(Mode):
 class CutScreenMode(Mode):
     def appStarted(mode):
         mode.counter = 0
-        mode.cutScreenImages = [mode.loadImage('cut1.png'),
-            mode.loadImage('cut2.png'),
-            mode.loadImage('cut13.png'),
-            mode.loadImage('cut4.png'),
-            mode.loadImage('cut5.png'),
-            mode.loadImage('cut6.png'),
-            mode.loadImage('cut7.png'),
-            mode.loadImage('cut8.png'),
-            mode.loadImage('cut9.png'),
-            mode.loadImage('cut10.png'),
-            mode.loadImage('cut11.png'),
-            mode.loadImage('cut12.png'),
-            mode.loadImage('cut13.png'),
-            mode.loadImage('cut14.png'),
-            mode.loadImage('cut15.png'),
-            mode.loadImage('cut16.png'),
-            mode.loadImage('cut17.png'),
-            mode.loadImage('cut18.png'),
-            mode.loadImage('cut19.png'),
-            mode.loadImage('cut20.png'),
-            mode.loadImage('cut21.png'),
-            mode.loadImage('cut22.png'),
-            mode.loadImage('cut23.png'),
-            mode.loadImage('cut24.png'),
-            mode.loadImage('cut25.png'),
-            mode.loadImage('cut26.png'),
-            mode.loadImage('cut27.png'),
-            mode.loadImage('cut28.png'),
-            mode.loadImage('cut29.png'),
-            mode.loadImage('cut30.png'),
-            mode.loadImage('cut31.png'),
-            mode.loadImage('cut32.png'),
-            mode.loadImage('cut33.png'),
-            mode.loadImage('cut34.png'),
-            mode.loadImage('cut35.png'),
-            mode.loadImage('cut36.png'),
-            mode.loadImage('cut37.png'),
-            mode.loadImage('cut38.png')]
+        mode.cutScreenImages = [mode.loadImage('cut1.png'), mode.loadImage('cut2.png'),
+            mode.loadImage('cut13.png'),mode.loadImage('cut4.png'),mode.loadImage('cut5.png'),
+            mode.loadImage('cut6.png'),mode.loadImage('cut7.png'),mode.loadImage('cut8.png'),
+            mode.loadImage('cut9.png'),mode.loadImage('cut10.png'),mode.loadImage('cut11.png'),
+            mode.loadImage('cut12.png'),mode.loadImage('cut13.png'),mode.loadImage('cut14.png'),
+            mode.loadImage('cut15.png'),mode.loadImage('cut16.png'),mode.loadImage('cut17.png'),
+            mode.loadImage('cut18.png'),mode.loadImage('cut19.png'),mode.loadImage('cut20.png'),
+            mode.loadImage('cut21.png'),mode.loadImage('cut22.png'),mode.loadImage('cut23.png'),
+            mode.loadImage('cut24.png'),mode.loadImage('cut25.png'),mode.loadImage('cut26.png'),
+            mode.loadImage('cut27.png'),mode.loadImage('cut28.png'),mode.loadImage('cut29.png'),
+            mode.loadImage('cut30.png'),mode.loadImage('cut31.png'),mode.loadImage('cut32.png'),
+            mode.loadImage('cut33.png'),mode.loadImage('cut34.png'),mode.loadImage('cut35.png'),
+            mode.loadImage('cut36.png'),mode.loadImage('cut37.png'),mode.loadImage('cut38.png')]
         mode.currImage = mode.cutScreenImages[0]
 
     def mousePressed(mode, event):
         clickX, clickY = event.x, event.y
         if(clickX < mode.width//2 + 50 and clickX > mode.width//2 - 50):
             if(clickY < mode.height//2 + 200 and clickY > mode.height//2 + 150):
-                mode.app.setActiveMode(mode.app.tutorialMode)
+                if(TitleScreenMode.tutorialComplete):
+                    mode.app.setActiveMode(mode.app.levelSelect)
+                else:
+                    mode.app.setActiveMode(mode.app.tutorialMode)
 
     def timerFired(mode):
         mode.counter += .25
@@ -1199,13 +1927,13 @@ class InstructionsMode(Mode):
         canvas.create_image(mode.cx - mode.cx//2 + 50, 225, image = ImageTk.PhotoImage(mode.rightKey))
         canvas.create_image(mode.cx - mode.cx//2 + 50, 300, image = ImageTk.PhotoImage(mode.leftKey))
         canvas.create_image(mode.cx - mode.cx//2 + 50, 375, image = ImageTk.PhotoImage(mode.spaceBar))
-        canvas.create_text(mode.cx, 150, text = 'Press Up to jump',\
+        canvas.create_text(mode.cx, 150, text = 'Press Up/w to jump',\
             font = 'System 12', fill = 'white')
-        canvas.create_text(mode.cx + 25, 225, text = 'Press Right to move the player right',\
+        canvas.create_text(mode.cx + 40, 225, text = 'Press Right/d to move the player right',\
             font = 'System 12', fill = 'white')
-        canvas.create_text(mode.cx + 25, 300, text = 'Press Left to move the player right',\
+        canvas.create_text(mode.cx + 35, 300, text = 'Press Left/a to move the player right',\
             font = 'System 12', fill = 'white')
-        canvas.create_text(mode.cx + 50, 375, text = 'Press Space to shoot enemies',\
+        canvas.create_text(mode.cx + 65, 375, text = 'Press Space/Tab to shoot enemies',\
             font = 'System 12', fill = 'white')
 
 class PauseMenuMode(Mode):
@@ -1214,13 +1942,21 @@ class PauseMenuMode(Mode):
     
     def keyPressed(mode, event):
         if(event.key == 'p'):
-            mode.app.setActiveMode(mode.app.tutorialMode)
+            if(GameMode.isPaused):
+                GameMode.isPaused = False
+                mode.app.setActiveMode(mode.app.gameMode)
+            else:
+                mode.app.setActiveMode(mode.app.tutorialMode)
     
     def mousePressed(mode, event):
         clickX, clickY = event.x, event.y
         if(clickX > mode.cx - mode.cx // 4 and clickX < mode.cx + mode.cx // 4):
             if(clickY > mode.cy - 15 and clickY < mode.cy + 15):
-                mode.app.setActiveMode(mode.app.tutorialMode)
+                if(GameMode.isPaused):
+                    GameMode.isPaused = False
+                    mode.app.setActiveMode(mode.app.gameMode)
+                else:
+                    mode.app.setActiveMode(mode.app.tutorialMode)
         if(clickX > 50 and clickX < 100):
             if(clickY > mode.height-50 and clickY < mode.height-25):
                 mode.app.setActiveMode(mode.app.titleScreenMode)
@@ -1238,24 +1974,50 @@ class PauseMenuMode(Mode):
             font = 'System 10 bold')
 
 
-'''
 class WinMode(Mode):
     def appStarted(mode):
-'''
+        mode.rectWidth = 25
+        mode.rectHeight = 15
+        mode.credits = f'''\t\t\t\t\t   Credits: \n
+                            Game Code: Remington Frank \t\t\t Music: Remington Frank \n
+                            Illustration: Remington Frank \t\t\t Player: {Team.teamNames}
+                        '''
+    
+    def mousePressed(mode, event):
+        clickX, clickY = event.x, event.y
+        if(clickX > 50 and clickX < 100):
+            if(clickY > mode.height-50 and clickY < mode.height-25):
+                mode.app.setActiveMode(mode.app.highScores)
+
+    def redrawAll(mode, canvas):
+        canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
+        canvas.create_text(mode.width//2, mode.height//2 - mode.height//4, text = 'Congrats', font = 'System 30', fill = 'white')
+        canvas.create_rectangle(35, mode.height-50, 115, mode.height-25, fill = 'red',\
+            outline = 'white')
+        canvas.create_text(75, mode.height - 37.5, text = 'View Scores', fill = 'black',\
+            font = 'System 10 bold')
+        
+        canvas.create_text(mode.width//2 - mode.width//8, mode.height//2 + mode.height//6, text = mode.credits, font = 'System 14', fill = 'white')
+
 class MyModalApp(ModalApp):
+    pygame.init()
+    pygame.mixer.music.load("LimboGameMusic.wav")
+    pygame.mixer.music.play(-1)
+    pygame.mixer.music.set_volume(.1)
     def appStarted(app):
         app.titleScreenMode = TitleScreenMode()
         app.overMode = GameOverMode()
-        #app.gameMode = GameMode()
+        app.gameMode = GameMode()
         app.tutorialMode = TutorialMode()
         app.helpMode = InstructionsMode()
         app.playerDesignModeOne = PlayerDesignModeOne()
         app.playerDesignModeTwo = PlayerDesignModeTwo()
-        #app.winningMode = WinMode()
+        app.winningMode = WinMode()
         app.pauseMode = PauseMenuMode()
         app.cutScreen = CutScreenMode()
         app.highScores = HighScoresMode()
         app.wallOfFame = WallOfFameMode()
+        app.levelSelect = LevelSelectMode()
         app.setActiveMode(app.titleScreenMode)
         app.timerDelay = 25
 
@@ -1263,5 +2025,7 @@ LoginInfo()
 
 if(LoginInfo.proceed):
     app = MyModalApp(width=700, height=500)
+pygame.mixer.music.stop()
+
 
 

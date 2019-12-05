@@ -15,6 +15,12 @@ import pygame
 #and then checks that team name with existing team names stored in a jstor file online.
 #The use of GUI and some of this code is inspired by: https://www.youtube.com/watch?v=RTM9tiV_HoY
 #(mainly for syntax purposes since I don't know the syntax for making a GUI in Python)
+
+
+#If there is an appearance of a 'magic number' it is based off of the boundaries of the image used for a certain model.
+#There was a significant amount of different images used to build this game, so it was impractical to create variables
+#for the dimensions of every differing image.
+
 class LoginInfo(object):
     teamName = ''
     proceed = True
@@ -276,12 +282,10 @@ class TutorialMode(Mode):
             mode.playerTwoJumpCount += 1
             mode.twoIsJumping = True
         elif(event.key == "Right" and not mode.oneIsDead):
-            #mode.playerOneCx += 10
             mode.oneIsFacingRight = True
             mode.rightKeyIsPressed = True
             mode.currPlayerModelOne = mode.stationaryAnimationRight[1]
         elif(event.key == 'Left' and not mode.oneIsDead):
-            #mode.playerOneCx -= 10
             mode.oneIsFacingRight = False
             mode.leftKeyIsPressed = True
             mode.rightKeyIsPressed = False
@@ -290,12 +294,10 @@ class TutorialMode(Mode):
             mode.isPaused = True
             mode.app.setActiveMode(mode.app.pauseMode)
         elif(event.key == 'd' and mode.playerNum == 2 and not mode.twoIsDead):
-            #mode.playerTwoCx += 10
             mode.twoIsFacingRight = True
             mode.dKeyIsPressed = True
             mode.currPlayerModelTwo = mode.stationaryAnimationRight[1]
         elif(event.key == 'a' and mode.playerNum == 2 and not mode.twoIsDead):
-            #mode.playerTwoCx -= 10
             mode.twoIsFacingRight = False
             mode.aKeyIsPressed = True
             mode.dKeyIsPressed = False
@@ -354,7 +356,7 @@ class TutorialMode(Mode):
         pass
     
     def timerFired(mode):
-        if(mode.enemiesKilled == 1):
+        if(mode.enemiesKilled >= 3):
             mode.tutorialComplete = True
         if(mode.isPaused):
             mode.isPaused = False
@@ -475,6 +477,7 @@ class TutorialMode(Mode):
                 mode.twoIsDead = False
                 mode.playerTwoHp = 100
             Enemy.enemies = []
+            Bullet.bullets = []
             mode.enemiesNum = 0
             mode.onStreak = False
             mode.streak = 0
@@ -498,6 +501,7 @@ class TutorialMode(Mode):
                 mode.playerTwoHp = 100
                 mode.playerTwoCy = 50
             Enemy.enemies = []
+            Bullet.bullets = []
             mode.enemiesNum = 0
             mode.onStreak = False
             mode.streak = 0
@@ -678,7 +682,6 @@ class TutorialMode(Mode):
                     mode.playerTwoCy - 50, fill = mode.playerTwoColor, outline = 'white', width = 2)
     
     def drawEnemies(mode, canvas):
-        #mode.enemyWalkingRightAnimation
         for enemy in Enemy.enemies:
             if(enemy[3]):
                 mode.currEnemyModel = mode.enemyWalkingRightAnimation[enemy[2] % 3]
@@ -726,6 +729,7 @@ class TutorialMode(Mode):
         mode.drawProjectiles(canvas)
         if(mode.oneIsDead or (mode.playerNum == 2 and mode.twoIsDead)):
             mode.drawDeath(canvas)
+
 
 class GameMode(Mode):
     isPaused = False
@@ -871,8 +875,17 @@ class GameMode(Mode):
         mode.endImage = mode.scaleImage(mode.loadImage('FriendTwo.png'), .4)
         mode.endPoint = mode.endImageOne
         mode.tree = mode.scaleImage(mode.loadImage('tree1.png'), .7)
-        mode.bench = mode.scaleImage(mode.loadImage('bench.png'), .3)
-        mode.well = mode.scaleImage(mode.loadimage('well.png'), .3)
+        mode.bench = mode.scaleImage(mode.loadImage('bench.png'), .7)
+        mode.benches = []
+        for i in range(1, 4):
+            mode.benches += [(i*1220, mode.height - 75)]
+        mode.well = mode.loadImage('well.png')
+        mode.wells = []
+        for j in range(1, 6):
+            mode.wells += [(j*860, mode.height - 100)]
+        
+        mode.oneOnWell = False
+        mode.oneOnBench = False
 
     
     def keyPressed(mode, event):
@@ -887,13 +900,11 @@ class GameMode(Mode):
             mode.playerTwoJumpCount += 1
             mode.twoIsJumping = True
         elif(event.key == "Right" and not mode.oneIsDead):
-            #mode.playerOneCx += 10
             mode.scrollX += 5
             mode.oneIsFacingRight = True
             mode.rightKeyIsPressed = True
             mode.currPlayerModelOne = mode.stationaryAnimationRight[1]
         elif(event.key == 'Left' and not mode.oneIsDead):
-            #mode.playerOneCx -= 10
             mode.scrollX -= 5
             mode.oneIsFacingRight = False
             mode.leftKeyIsPressed = True
@@ -903,12 +914,10 @@ class GameMode(Mode):
             GameMode.isPaused = True
             mode.app.setActiveMode(mode.app.pauseMode)
         elif(event.key == 'd' and mode.playerNum == 2 and not mode.twoIsDead):
-            #mode.playerTwoCx += 10
             mode.twoIsFacingRight = True
             mode.dKeyIsPressed = True
             mode.currPlayerModelTwo = mode.stationaryAnimationRight[1]
         elif(event.key == 'a' and mode.playerNum == 2 and not mode.twoIsDead):
-            #mode.playerTwoCx -= 10
             mode.twoIsFacingRight = False
             mode.aKeyIsPressed = True
             mode.dKeyIsPressed = False
@@ -932,6 +941,10 @@ class GameMode(Mode):
                 else:
                     Bullet(mode.playerTwoCx, mode.playerTwoCy-25, mode.playerTwoColor, -12)
                 mode.twoCanShoot = False
+        
+        #Shortcut
+        if(event.key == 'u'):
+            mode.gameWon = True
 
     def keyReleased(mode, event):
         if(event.key == "Right"):
@@ -1043,35 +1056,24 @@ class GameMode(Mode):
 
         #Walking Right
         if(mode.rightKeyIsPressed):
-            if(mode.playerNum == 1):
-                if(mode.playerOneCx >= mode.width - mode.width//4):
-                    mode.scrollX += 10
-                else:
-                    #mode.scrollX += 10
-                    mode.playerOneCx += mode.playerOneVel
+            if(mode.playerOneCx >= mode.width - mode.width//4):
+                if(mode.playerNum == 2 and mode.dKeyIsPressed == False):
+                    mode.playerTwoCx -= 10
+                mode.scrollX += 10
             else:
-                if(mode.playerOneCx >= mode.width - mode.width//4 and mode.playerTwoCx - 15 >= 20):
-                    mode.scrollX += 10
-                elif(mode.playerOneCx >= mode.width - mode.width//4 and mode.playerTwoCx - 15 < 20):
-                    pass
-                else:
-                    mode.playerOneCx += mode.playerOneVel
-                    if(mode.dKeyIsPressed == False):
-                        mode.playerTwoCx -= 10
+                mode.playerOneCx += mode.playerOneVel
             mode.walkCountOne += 1
             if(mode.walkCountOne >= 7):
                 mode.walkCountOne = 1
             mode.currPlayerOneModel = mode.walkingRightAnimation[mode.walkCountOne%7]
 
         if(mode.dKeyIsPressed and mode.playerNum == 2):
-            if(mode.playerTwoCx >= mode.width - mode.width//4 and mode.playerOneCx - 15 > 3):
-                mode.scrollX += 10
-            elif(mode.playerTwoCx >= mode.width - mode.width//4 and mode.playerOneCx - 15 < 3):
-                pass
-            else:
-                mode.playerTwoCx += mode.playerTwoVel
+            if(mode.playerTwoCx >= mode.width - mode.width//4):
                 if(mode.rightKeyIsPressed == False):
                     mode.playerOneCx -= 10
+                mode.scrollX += 10
+            else:
+                mode.playerTwoCx += mode.playerTwoVel
             mode.walkCountTwo += 1
             if(mode.walkCountTwo >= 7):
                 mode.walkCountTwo = 1
@@ -1080,6 +1082,8 @@ class GameMode(Mode):
         #Walking Left
         if(mode.leftKeyIsPressed):
             if(mode.playerOneCx <= mode.width//4):
+                if(mode.playerNum == 2 and mode.aKeyIsPressed == False):
+                    mode.playerTwoCx += 10
                 mode.scrollX -= 10
             else:
                 mode.scrollX -= 10
@@ -1088,12 +1092,15 @@ class GameMode(Mode):
             if(mode.walkCountOne >= 7):
                 mode.walkCountOne = 1
             mode.currPlayerOneModel = mode.walkingLeftAnimation[mode.walkCountOne%7]
+
         if(mode.aKeyIsPressed and mode.playerNum == 2):
             if(mode.playerTwoCx <= mode.width//4):
-                mode.walkCountTwo +=1
+                if(mode.leftKeyIsPressed == False):
+                    mode.playerOneCx += 10
             else:
                 mode.playerTwoCx -= mode.playerTwoVel
-                mode.walkCountTwo += 1
+                mode.scrollX -= 10
+            mode.walkCountTwo += 1
             if(mode.walkCountTwo >= 7):
                 mode.walkCountTwo = 1
             mode.currPlayerTwoModel = mode.walkingLeftAnimation[mode.walkCountTwo%7]
@@ -1188,6 +1195,7 @@ class GameMode(Mode):
             if(mode.oneIsDead):
                 mode.isGameOver = True
 
+        
         mode.playerOneCy += mode.playerOneDy
         mode.checkPlayerOneBounds()
         mode.checkBulletBounds()
@@ -1195,8 +1203,73 @@ class GameMode(Mode):
         mode.checkBulletHits()
         mode.checkEnemyAttack()
         mode.checkWallHits()
+        mode.checkWellAndBenchHit()
 
         mode.birdPosition += 1
+
+    
+    def checkWellAndBenchHit(mode):
+        for well in mode.wells:
+            if((mode.rightKeyIsPressed or (mode.playerNum == 2 and mode.dKeyIsPressed)) and 
+                mode.playerOneCx + 10 >= well[0] - mode.scrollX - 45 and 
+                mode.playerOneCx - 15 <= well[0] - mode.scrollX + 25 and 
+                mode.playerOneCy + 20 > well[1] - 10):
+                mode.playerOneCx = well[0] - mode.scrollX - 55
+                mode.playerOneCx -= 10
+            elif(mode.playerOneCx + 15 >= well[0] - mode.scrollX - 45 and mode.playerOneCx - 15 <= well[0] - mode.scrollX + 25 and
+                mode.playerOneCy + 10 <= well[1] - 10):
+                mode.playerOneCy = well[1] - 40
+                mode.playerOneJumpCount = 0
+            elif((mode.leftKeyIsPressed or (mode.playerNum == 2 and mode.aKeyIsPressed)) and 
+                mode.playerOneCx - 10 <= well[0] - mode.scrollX + 25 and
+                mode.playerOneCx >= well[0] - mode.scrollX - 45 and 
+                mode.playerOneCy + 20 > well[1] - 10):
+                mode.playerOneCx = well[0] - mode.scrollX + 35
+                mode.playerOneCx += 10
+
+            if(mode.playerNum == 2):
+                if((mode.dKeyIsPressed or mode.rightKeyIsPressed) and mode.playerTwoCx + 10 >= well[0] - mode.scrollX - 45 and 
+                    mode.playerTwoCx - 15 <= well[0] - mode.scrollX + 25 and mode.playerTwoCy + 20 > well[1] - 10):
+                    mode.playerTwoCx = well[0] - mode.scrollX - 55
+                    mode.playerTwoCx -= 10
+                elif(mode.playerTwoCx + 15 >= well[0] - mode.scrollX - 45 and mode.playerTwoCx - 15 <= well[0] - mode.scrollX + 25 and
+                    mode.playerTwoCy + 10 <= well[1] - 10):
+                    mode.playerTwoCy = well[1] - 40
+                    mode.playerTwoJumpCount = 0
+                elif((mode.aKeyIsPressed or mode.leftKeyIsPressed) and mode.playerTwoCx - 10 <= well[0] - mode.scrollX + 25 and
+                    mode.playerTwoCx >= well[0] - mode.scrollX - 45 and mode.playerTwoCy + 20 > well[1] - 10):
+                    mode.playerTwoCx = well[0] - mode.scrollX + 35
+                    mode.playerTwoCx += 10
+
+        for bench in mode.benches:
+            if((mode.rightKeyIsPressed or (mode.playerNum == 2 and mode.dKeyIsPressed)) and 
+                mode.playerOneCx + 10 >= bench[0] - mode.scrollX - 65 and 
+                mode.playerOneCx - 15 <= bench[0] - mode.scrollX + 50 and 
+                mode.playerOneCy + 20 > bench[1] - 10):
+                mode.playerOneCx = bench[0] - mode.scrollX - 75
+                mode.playerOneCx -= 10
+            elif(mode.playerOneCx + 15 >= bench[0] - mode.scrollX - 65 and mode.playerOneCx - 15 <= bench[0] - mode.scrollX + 50 and
+                mode.playerOneCy + 10 <= bench[1] - 10):
+                mode.playerOneCy = bench[1] - 40
+                mode.playerOneJumpCount = 0
+            elif(mode.leftKeyIsPressed and mode.playerOneCx - 10 <= bench[0] - mode.scrollX + 50 and
+                mode.playerOneCx >= bench[0] - mode.scrollX - 65 and mode.playerOneCy + 20 > bench[1] - 10):
+                mode.playerOneCx = bench[0] - mode.scrollX + 60
+                mode.playerOneCx += 10
+
+            if(mode.playerNum == 2):
+                if(mode.dKeyIsPressed and mode.playerTwoCx + 10 >= bench[0] - mode.scrollX - 50 and 
+                    mode.playerTwoCx - 15 <= bench[0] - mode.scrollX + 30 and mode.playerTwoCy + 20 > bench[1] - 10):
+                    mode.playerTwoCx = bench[0] - mode.scrollX - 60
+                    mode.playerTwoCx -= 10
+                elif(mode.playerTwoCx + 15 >= bench[0] - mode.scrollX - 50 and mode.playerTwoCx - 15 <= bench[0] - mode.scrollX + 30 and
+                    mode.playerTwoCy + 10 <= bench[1] - 10):
+                    mode.playerTwoCy = bench[1] - 40
+                    mode.playerTwoJumpCount = 0
+                elif(mode.aKeyIsPressed and mode.playerTwoCx - 10 <= bench[0] - mode.scrollX + 50 and
+                    mode.playerTwoCx >= bench[0] - mode.scrollX - 65 and mode.playerTwoCy + 20 > bench[1] - 10):
+                    mode.playerTwoCx = bench[0] - mode.scrollX + 60
+                    mode.playerTwoCx += 10
 
     def checkBulletBounds(mode):
         for bullet in Bullet.bullets:
@@ -1377,6 +1450,13 @@ class GameMode(Mode):
             canvas.create_image(mode.playerOneCx - 50, mode.playerOneCy + 3, image = ImageTk.PhotoImage(mode.halo))
         elif(mode.playerNum == 2 and mode.twoIsDead):
             canvas.create_image(mode.playerTwoCx - 50, mode.playerTwoCy + 3, image = ImageTk.PhotoImage(mode.halo))
+    
+    def drawWellsAndBenches(mode, canvas):
+        for bench in mode.benches:
+            canvas.create_image(bench[0] - mode.scrollX, bench[1], image = ImageTk.PhotoImage(mode.bench))
+
+        for well in mode.wells:
+            canvas.create_image(well[0] - mode.scrollX, well[1], image = ImageTk.PhotoImage(mode.well))
 
     def redrawAll(mode, canvas):
         canvas.create_rectangle(0, 0, mode.width, mode.height, fill = 'grey15')
@@ -1385,6 +1465,7 @@ class GameMode(Mode):
         for wall in Wall.wallList:
             canvas.create_rectangle(wall[0] + wall[2] - mode.scrollX, wall[1] - wall[3],
                 wall[0] - wall[2] - mode.scrollX, wall[1] + wall[3], fill = 'black')
+        mode.drawWellsAndBenches(canvas)
         canvas.create_image(5000 - 250 - mode.scrollX, mode.height - 70, image = ImageTk.PhotoImage(mode.endPoint))
         mode.drawScore(canvas)
         mode.drawHp(canvas)
